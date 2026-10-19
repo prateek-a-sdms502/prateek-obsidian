@@ -1,0 +1,13 @@
+# Serving-efficiency coefficients. Defaults are PLACEHOLDERS until calibrated against
+# research_notes/.../inference_performance.md and the paid benchmark.
+default:
+  e_mem_util: {value: 0.90, source: "vLLM/SGLang default gpu_memory_utilization / mem_fraction_static"}
+  e_overhead_gb: {value: 10, source: PLACEHOLDER}
+  e_bw_eff: {value: 0.65, source: PLACEHOLDER}
+  e_flop_eff: {value: 0.35, source: PLACEHOLDER}
+  e_pf_eff: {value: 0.45, source: PLACEHOLDER}
+  e_xnode_lat_us: {value: 120, source: PLACEHOLDER}
+  e_frag: {value: 1.10, source: "ASSUMPTION: paged-KV imbalance across DP ranks/replicas"}
+  e_max_batch: {value: 256, source: "Typical max running sequences per replica"}
+  e_min_batch: {value: 8, source: "ASSUMPTION: a replica must hold at least 8 sequences at mean context"}
+overrides: {}

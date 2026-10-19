@@ -1,0 +1,95 @@
+# GPU platforms. One "node" = the unit you buy/rent: an 8-GPU server, or a 72-GPU NVL72 rack.
+# Specs: vendor datasheets (dense, no sparsity). Prices: research_notes/.../hardware_prices.md (USD, ex-tax, ex-shipping, Oct 2026).
+# Cloud rates: research_notes/.../cloud_rental_prices.md.
+gpus:
+  h200:
+    label: NVIDIA HGX H200 (8x141 GB)
+    g_hbm_gb: {value: 141, source: "NVIDIA H200 datasheet"}
+    g_bw_tbs: {value: 4.8, source: "NVIDIA H200 datasheet"}
+    tflops:
+      fp4: null          # no FP4 tensor cores on Hopper
+      fp8: {value: 1979, source: "NVIDIA H200 datasheet (dense)"}
+      bf16: {value: 989, source: "NVIDIA H200 datasheet (dense)"}
+      fp32: {value: 67, source: "NVIDIA H200 datasheet (non-tensor FP32)"}
+    fp4_fallback: fp8
+    g_per_node: 8
+    g_node_kw: {value: 10.2, source: "NVIDIA DGX H200 max system power"}
+    g_lat_us: {value: 30, source: "ASSUMPTION: NVLink all-to-all dispatch/combine latency at decode, calibrate with benchmark"}
+    g_node_usd: {value: 323685, source: "Supermicro eStore SYS-821GE-TNHR (range $300k-420k)", url: "https://store.supermicro.com/us_en/systems/gpu.html?p=2", date: "2026-10-19"}
+    g_rack_kw: {value: 30, source: "Air-cooled racks <= 30 kW (2 nodes/rack)"}
+    g_rate_od_usd: {value: 3.0, source: PLACEHOLDER}
+    g_rate_res1_usd: {value: 2.4, source: PLACEHOLDER}
+    g_rate_res3_usd: {value: 2.0, source: PLACEHOLDER}
+    g_rate_in_inr: {value: 280, source: PLACEHOLDER}
+  b200:
+    label: NVIDIA HGX B200 (8x180 GB)
+    g_hbm_gb: {value: 180, source: "NVIDIA HGX B200 (8x180 GB = 1.44 TB)"}
+    g_bw_tbs: {value: 8.0, source: "NVIDIA B200 datasheet"}
+    tflops:
+      fp4: {value: 9000, source: "NVIDIA B200 (dense FP4)"}
+      fp8: {value: 4500, source: "NVIDIA B200 (dense FP8)"}
+      bf16: {value: 2250, source: "NVIDIA B200 (dense BF16)"}
+      fp32: {value: 75, source: "NVIDIA B200 (FP32)"}
+    g_per_node: 8
+    g_node_kw: {value: 14.3, source: "NVIDIA DGX B200 max system power"}
+    g_lat_us: {value: 25, source: "ASSUMPTION: NVLink5 all-to-all latency at decode, calibrate"}
+    g_node_usd: {value: 395000, source: "Exxact / Supermicro HGX B200 8-GPU ($384k-403k; range $340k-515k)", url: "https://www.exxactcorp.com/Exxact-TS4-124903244-E124903244", date: "2026-07..10"}
+    g_rack_kw: {value: 30, source: "Air-cooled racks <= 30 kW (2 nodes/rack)"}
+    g_rate_od_usd: {value: 4.5, source: PLACEHOLDER}
+    g_rate_res1_usd: {value: 3.6, source: PLACEHOLDER}
+    g_rate_res3_usd: {value: 3.0, source: PLACEHOLDER}
+    g_rate_in_inr: {value: 420, source: PLACEHOLDER}
+  b300:
+    label: NVIDIA HGX B300 (8x288 GB)
+    g_hbm_gb: {value: 288, source: "NVIDIA HGX B300 (8x288 GB); some SKUs 270 GB"}
+    g_bw_tbs: {value: 8.0, source: "NVIDIA B300 datasheet"}
+    tflops:
+      fp4: {value: 13500, source: "NVIDIA HGX B300 (dense FP4)"}
+      fp8: {value: 4500, source: "NVIDIA B300 (dense FP8)"}
+      bf16: {value: 2250, source: "NVIDIA B300 (dense BF16)"}
+      fp32: {value: 75, source: "NVIDIA B300 (FP32)"}
+    g_per_node: 8
+    g_node_kw: {value: 14.5, source: "NVIDIA DGX B300 ~14-14.5 kW"}
+    g_lat_us: {value: 25, source: "ASSUMPTION: NVLink5 all-to-all latency at decode, calibrate"}
+    g_node_usd: {value: 545173, source: "Supermicro eStore HGX B300 (BIZON $496,639; range $375k-700k)", url: "https://store.supermicro.com/us_en/systems/gpu.html", date: "2026-07..10"}
+    g_rack_kw: {value: 30, source: "Air-cooled racks <= 30 kW (2 nodes/rack)"}
+    g_rate_od_usd: {value: 5.5, source: PLACEHOLDER}
+    g_rate_res1_usd: {value: 4.4, source: PLACEHOLDER}
+    g_rate_res3_usd: {value: 3.6, source: PLACEHOLDER}
+    g_rate_in_inr: {value: 520, source: PLACEHOLDER}
+  mi355x:
+    label: AMD Instinct MI355X (8x288 GB)
+    g_hbm_gb: {value: 288, source: "AMD MI355X datasheet"}
+    g_bw_tbs: {value: 8.0, source: "AMD MI355X datasheet"}
+    tflops:
+      fp4: {value: 10070, source: "AMD MI355X (dense MXFP4)"}
+      fp8: {value: 5030, source: "AMD MI355X (dense FP8)"}
+      bf16: {value: 2515, source: "AMD MI355X (dense BF16)"}
+      fp32: {value: 157, source: "AMD MI355X (FP32 vector)"}
+    g_per_node: 8
+    g_node_kw: {value: 14.5, source: "8x1.4 kW GPUs + host; inferred (hardware_prices.md)"}
+    g_lat_us: {value: 35, source: "ASSUMPTION: Infinity Fabric all-to-all latency at decode, calibrate"}
+    g_node_usd: {value: 330000, source: "INFERRED: no verified 2026 US price; EU listing ~EUR261k ex-VAT, config unverified; range ~$280k-400k", url: "https://smicro.eu/supermicro-as-4126gs-nmr-lcc-g1-2", date: "2026"}
+    g_rack_kw: {value: 60, source: "MI355X is direct-liquid-cooled (4U DLC) -> liquid cooling, 4 nodes/rack"}
+    g_rate_od_usd: {value: 3.0, source: PLACEHOLDER}
+    g_rate_res1_usd: {value: 2.5, source: PLACEHOLDER}
+    g_rate_res3_usd: {value: 2.1, source: PLACEHOLDER}
+    g_rate_in_inr: {value: 300, source: PLACEHOLDER}
+  gb300nvl72:
+    label: NVIDIA GB300 NVL72 (rack, 72x288 GB)
+    g_hbm_gb: {value: 288, source: "NVIDIA GB300 NVL72 (~21 TB HBM per rack)"}
+    g_bw_tbs: {value: 8.0, source: "NVIDIA GB300"}
+    tflops:
+      fp4: {value: 15000, source: "NVIDIA GB300 (dense FP4 per GPU, higher TDP than HGX B300)"}
+      fp8: {value: 5000, source: "NVIDIA GB300 (dense FP8 per GPU)"}
+      bf16: {value: 2500, source: "NVIDIA GB300 (dense BF16 per GPU)"}
+      fp32: {value: 75, source: "NVIDIA GB300 (FP32)"}
+    g_per_node: 72
+    g_node_kw: {value: 155, source: "GB300 NVL72: 132 kW nominal, ~155 kW peak (HPE: provision 192 kW)", url: "https://www.hpe.com/us/en/collaterals/collateral.a50009244enw.html"}
+    g_lat_us: {value: 30, source: "ASSUMPTION: NVLink-72 all-to-all latency at decode, calibrate"}
+    g_node_usd: {value: 5032000, source: "~$5.0M per rack ex-works from Aug-2026 POs + ~$32k in-rack CDU (range $3.7M-6.5M)", url: "https://www.datagravity.dev/p/how-much-does-an-nvidia-nvl72-cost", date: "2026-08"}
+    g_rack_kw: {value: 155, source: "One liquid-cooled rack"}
+    g_rate_od_usd: {value: 6.5, source: PLACEHOLDER}
+    g_rate_res1_usd: {value: 5.2, source: PLACEHOLDER}
+    g_rate_res3_usd: {value: 4.3, source: PLACEHOLDER}
+    g_rate_in_inr: {value: 650, source: PLACEHOLDER}

@@ -70,7 +70,7 @@ def header(ws, row, labels, widths=None):
 
 
 def src_text(m):
-    parts = [m.get("source", ""), m.get("date", ""), m.get("note", "")]
+    parts = [str(m.get(k, "")) for k in ("source", "url", "date", "note")]
     return " | ".join(p for p in parts if p)
 
 

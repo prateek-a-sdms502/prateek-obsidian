@@ -1,0 +1,49 @@
+# PLACEHOLDER values: replaced from research_notes/.../model_specs.md once available.
+models:
+  glm53:
+    label: GLM-5.3 (Z.ai)
+    m_active_b: {value: 40, source: PLACEHOLDER}
+    m_layers: {value: 78, source: PLACEHOLDER}
+    m_native_ctx: {value: 1048576, source: PLACEHOLDER}
+    m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
+    m_attend_cap: {value: 2048, source: PLACEHOLDER}
+    m_attn_flop_ctx: {value: 10900000, source: PLACEHOLDER}
+    m_idx_flop_ctx: {value: 1280000, source: PLACEHOLDER}
+    m_mtp_draft: {value: 1, source: PLACEHOLDER}
+    m_mtp_accept: {value: 1.7, source: PLACEHOLDER}
+    precisions:
+      bf16: {compute_fmt: bf16, m_weights_gb: 1508, m_repl_gb: 60, m_kv_tok_b: 109824, m_kv_read_tok_b: 20000, m_kv_read_fixed_b: 184000000, m_deployable: 1}
+      fp8: {compute_fmt: fp8, m_weights_gb: 760, m_repl_gb: 31, m_kv_tok_b: 61464, m_kv_read_tok_b: 10296, m_kv_read_fixed_b: 105000000, m_deployable: 1}
+      fp32: {compute_fmt: fp32, m_weights_gb: 3016, m_repl_gb: 120, m_kv_tok_b: 219648, m_kv_read_tok_b: 40000, m_kv_read_fixed_b: 368000000, m_deployable: 0}
+  dsv4pro:
+    label: DeepSeek V4 Pro
+    m_active_b: {value: 49, source: PLACEHOLDER}
+    m_layers: {value: 61, source: PLACEHOLDER}
+    m_native_ctx: {value: 1048576, source: PLACEHOLDER}
+    m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
+    m_attend_cap: {value: 4096, source: PLACEHOLDER}
+    m_attn_flop_ctx: {value: 17000000, source: PLACEHOLDER}
+    m_idx_flop_ctx: {value: 500000, source: PLACEHOLDER}
+    m_mtp_draft: {value: 1, source: PLACEHOLDER}
+    m_mtp_accept: {value: 1.7, source: PLACEHOLDER}
+    precisions:
+      native: {compute_fmt: fp4, m_weights_gb: 870, m_repl_gb: 60, m_kv_tok_b: 4800, m_kv_read_tok_b: 1200, m_kv_read_fixed_b: 50000000, m_deployable: 1}
+      fp8: {compute_fmt: fp8, m_weights_gb: 1620, m_repl_gb: 60, m_kv_tok_b: 4800, m_kv_read_tok_b: 1200, m_kv_read_fixed_b: 50000000, m_deployable: 1}
+      bf16: {compute_fmt: bf16, m_weights_gb: 3200, m_repl_gb: 120, m_kv_tok_b: 9600, m_kv_read_tok_b: 2400, m_kv_read_fixed_b: 100000000, m_deployable: 1}
+      fp32: {compute_fmt: fp32, m_weights_gb: 6400, m_repl_gb: 240, m_kv_tok_b: 19200, m_kv_read_tok_b: 4800, m_kv_read_fixed_b: 200000000, m_deployable: 0}
+  kimi27:
+    label: Kimi K2.7 Code (Moonshot)
+    m_active_b: {value: 32, source: PLACEHOLDER}
+    m_layers: {value: 61, source: PLACEHOLDER}
+    m_native_ctx: {value: 262144, source: PLACEHOLDER}
+    m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
+    m_attend_cap: {value: 1.0e12, source: "Dense MLA attention"}
+    m_attn_flop_ctx: {value: 8500000, source: PLACEHOLDER}
+    m_idx_flop_ctx: {value: 0, source: "No sparse indexer"}
+    m_mtp_draft: {value: 0, source: PLACEHOLDER}
+    m_mtp_accept: {value: 1, source: PLACEHOLDER}
+    precisions:
+      native: {compute_fmt: fp8, m_weights_gb: 594, m_repl_gb: 32, m_kv_tok_b: 40016, m_kv_read_tok_b: 40016, m_kv_read_fixed_b: 0, m_deployable: 1}
+      fp8: {compute_fmt: fp8, m_weights_gb: 1030, m_repl_gb: 16, m_kv_tok_b: 40016, m_kv_read_tok_b: 40016, m_kv_read_fixed_b: 0, m_deployable: 1}
+      bf16: {compute_fmt: bf16, m_weights_gb: 2060, m_repl_gb: 32, m_kv_tok_b: 70272, m_kv_read_tok_b: 70272, m_kv_read_fixed_b: 0, m_deployable: 1}
+      fp32: {compute_fmt: fp32, m_weights_gb: 4120, m_repl_gb: 64, m_kv_tok_b: 140544, m_kv_read_tok_b: 140544, m_kv_read_fixed_b: 0, m_deployable: 0}
