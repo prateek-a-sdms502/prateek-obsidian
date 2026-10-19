@@ -1,0 +1,33 @@
+# Chandra OCR 2 (4B). PLACEHOLDER throughput until inference_performance.md lands.
+tiers: {light: 1000, medium: 10000, heavy: 50000}
+gpus:
+  l40s:
+    q_gpus_per_srv: 4
+    q_srv_usd: 60000
+    q_srv_kw: 2.5
+    q_rate_usd: 0.9
+    q_rate_in_inr: 90
+    precisions:
+      bf16: {q_pages_s_gpu: 1.0, q_deployable: 1}
+      fp8: {q_pages_s_gpu: 1.5, q_deployable: 1}
+      fp32: {q_pages_s_gpu: 0.15, q_deployable: 1}
+  rtxpro6000:
+    q_gpus_per_srv: 4
+    q_srv_usd: 127673
+    q_srv_kw: 3.8
+    q_rate_usd: 1.5
+    q_rate_in_inr: 150
+    precisions:
+      bf16: {q_pages_s_gpu: 1.8, q_deployable: 1}
+      fp8: {q_pages_s_gpu: 2.6, q_deployable: 1}
+      fp32: {q_pages_s_gpu: 0.25, q_deployable: 1}
+  h100:
+    q_gpus_per_srv: 8
+    q_srv_usd: 280000
+    q_srv_kw: 10.2
+    q_rate_usd: 2.2
+    q_rate_in_inr: 200
+    precisions:
+      bf16: {q_pages_s_gpu: 2.5, q_deployable: 1}
+      fp8: {q_pages_s_gpu: 3.5, q_deployable: 1}
+      fp32: {q_pages_s_gpu: 0.4, q_deployable: 1}

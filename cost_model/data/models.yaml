@@ -37,7 +37,7 @@ models:
     m_layers: {value: 61, source: PLACEHOLDER}
     m_native_ctx: {value: 262144, source: PLACEHOLDER}
     m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
-    m_attend_cap: {value: 1.0e12, source: "Dense MLA attention"}
+    m_attend_cap: {value: 1000000000000, source: "Dense MLA attention"}
     m_attn_flop_ctx: {value: 8500000, source: PLACEHOLDER}
     m_idx_flop_ctx: {value: 0, source: "No sparse indexer"}
     m_mtp_draft: {value: 0, source: PLACEHOLDER}

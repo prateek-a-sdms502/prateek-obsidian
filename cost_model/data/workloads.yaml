@@ -1,0 +1,89 @@
+# Workload profiles. Agent profiles use the auto-summarisation saw-tooth:
+# context grows from c_floor to the trigger T, then a summary compacts it back to c_floor.
+# T = min(c_trigger, native window - c_reserve), so Kimi K2.7 (262,144) compacts at ~222k.
+workloads:
+  chat:
+    label: Chat / Q&A (short context)
+    w_duty: {value: 0.20, source: "ASSUMPTION: chat users generate ~10-25% of the time they are present"}
+    w_sawtooth: 0
+    w_ctx_mean: {value: 12000, source: "ASSUMPTION: typical chat context incl. system prompt"}
+    w_ctx_sd: {value: 10000, source: ASSUMPTION}
+    w_stress: 0
+    w_uncached_per_out: {value: 2.0, source: "ASSUMPTION: new user turn + attachments per output token, prefix cache on"}
+    w_cached_per_out: {value: 12, source: ASSUMPTION}
+    w_presence: {value: 0.6, source: "ASSUMPTION: average present users / peak over usage hours"}
+    w_turn_uncached: {value: 2000, source: ASSUMPTION}
+    w_out_share: {value: 0.30, source: ASSUMPTION}
+    c_ceiling: 1000000
+    c_trigger: 128000
+    c_floor: 16000
+    c_summary_out: 6000
+    c_reserve: 40000
+  mixed:
+    label: Mixed (70% chat users, 30% coding-agent users at T=128k)
+    w_duty: {value: 0.305, source: "0.7 x 0.20 + 0.3 x 0.55"}
+    w_sawtooth: 0
+    w_ctx_mean: {value: 44500, source: "Mixture of chat (12k) and agent saw-tooth (mean 72k) weighted by active sequences"}
+    w_ctx_sd: {value: 38700, source: "Mixture std-dev (chat sd 10k, agent sd 32.3k)"}
+    w_stress: 0
+    w_uncached_per_out: {value: 4.2, source: "Mixture of chat (2) and agent (6)"}
+    w_cached_per_out: {value: 30, source: "Mixture of chat (12) and agent (45)"}
+    w_presence: {value: 0.6, source: ASSUMPTION}
+    w_turn_uncached: {value: 4000, source: ASSUMPTION}
+    w_out_share: {value: 0.20, source: ASSUMPTION}
+    c_ceiling: 1000000
+    c_trigger: 128000
+    c_floor: 16000
+    c_summary_out: 8000
+    c_reserve: 40000
+  agent_128k:
+    label: Coding agents, compaction at 128k (1M ceiling via summaries)
+    w_duty: {value: 0.55, source: "ASSUMPTION: agents decode/prefill ~40-70% of session time (tool-call gaps)"}
+    w_sawtooth: 1
+    w_ctx_mean: 0
+    w_ctx_sd: 0
+    w_stress: 0
+    w_uncached_per_out: {value: 6.0, source: "ASSUMPTION: input:output ~50:1 with ~88% prefix-cache hit"}
+    w_cached_per_out: {value: 45, source: ASSUMPTION}
+    w_presence: {value: 0.6, source: ASSUMPTION}
+    w_turn_uncached: {value: 8000, source: ASSUMPTION}
+    w_out_share: {value: 0.15, source: "ASSUMPTION: most context growth is tool output and file reads"}
+    c_ceiling: 1000000
+    c_trigger: 128000
+    c_floor: 16000
+    c_summary_out: 8000
+    c_reserve: 40000
+  agent_1m:
+    label: Coding agents, full 1M window (compaction only near the limit)
+    w_duty: {value: 0.55, source: ASSUMPTION}
+    w_sawtooth: 1
+    w_ctx_mean: 0
+    w_ctx_sd: 0
+    w_stress: 0
+    w_uncached_per_out: {value: 6.0, source: ASSUMPTION}
+    w_cached_per_out: {value: 45, source: ASSUMPTION}
+    w_presence: {value: 0.6, source: ASSUMPTION}
+    w_turn_uncached: {value: 8000, source: ASSUMPTION}
+    w_out_share: {value: 0.15, source: ASSUMPTION}
+    c_ceiling: 1000000
+    c_trigger: 960000
+    c_floor: 32000
+    c_summary_out: 12000
+    c_reserve: 40000
+  stress_1m:
+    label: Worst case - every user active at the context ceiling at once
+    w_duty: 1.0
+    w_sawtooth: 0
+    w_ctx_mean: 0
+    w_ctx_sd: 0
+    w_stress: 1
+    w_uncached_per_out: {value: 6.0, source: ASSUMPTION}
+    w_cached_per_out: {value: 45, source: ASSUMPTION}
+    w_presence: 1.0
+    w_turn_uncached: {value: 8000, source: ASSUMPTION}
+    w_out_share: 0.15
+    c_ceiling: 1000000
+    c_trigger: 960000
+    c_floor: 32000
+    c_summary_out: 12000
+    c_reserve: 40000
