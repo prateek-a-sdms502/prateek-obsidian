@@ -32,9 +32,23 @@
               "icon": "lucide-file",
               "title": "19th Oct 2026"
             }
+          },
+          {
+            "id": "c7d09ca8b533e840",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "21st October 2026.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "21st October 2026"
+            }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -201,11 +215,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "b4aa4691582924df",
+  "active": "c7d09ca8b533e840",
   "lastOpenFiles": [
+    "Daily Log/19th Oct 2026.md",
+    "21st October 2026.md",
     "suraksha_ai_pipeline.md",
     "Untitled.md",
-    "Untitled 1.md",
     "Universal Voice AI Pipeline.md",
     "CLAUDE.md",
     "images/mermaid-flowchart-2026-10-15T12-30-36.png",
@@ -222,7 +237,6 @@
     "cost_model/out/lo_parity/done/lu127506944q1.tmp",
     "cost_model/out/lo_parity/done",
     "OnPrimGPUSetup/reports/Self hosting LLM cost Pune.md",
-    "Daily Log/19th Oct 2026.md",
     "Daily Log/16th Oct 2026.md"
   ]
 }
