@@ -10,6 +10,8 @@ The model sizes each model as its **own standalone deployment**, so the three ar
 
 The base levers are fixed: running 24/7, GST input credit claimed, no spare node, a 3-year horizon, and the HT commercial power tariff, because Stark Digital is not a registered IT/ITeS unit. The rental column is the cheapest cloud option plus one MLOps engineer. The duty cycles and context lengths are modelling assumptions, flagged as such in `workloads.yaml`. The agent profile is anchored on published coding-agent traces: a median of 88–142k input tokens and only about 376–444 output tokens per request, with about 99% of input cacheable ([InferenceX AgentX methodology](https://inferencex.semianalysis.com/agentx/methodology)).
 
+Each deployment is one or more copies of the model (replicas), and each replica spans one or more 8-GPU nodes. The model does not simply put a replica on the fewest nodes its weights fit on. It also tries spreading one replica over one or two more nodes, which leaves more memory for the KV cache but adds about 120 µs of cross-node latency to every collective, and it keeps whichever layout needs the fewest nodes in total. This fixed oversized results in an earlier version, where weights nearly filled a node and left little room for cache. GLM-5.3 FP8 on 8×H200 for 90 coding-agent users had needed 10 nodes and ₹134.9 lakh/month to rent; it now needs 3 nodes, with one replica across all three, at ₹42.7 lakh. The DeepSeek and Kimi BF16 results shrank for the same reason.
+
 **Cheapest option per model and workload, 90 users at 30 tok/s per user (₹ lakh/month)**
 
 | Model | Workload | Own room (Baner) | GPU / precision / nodes | Colo | Rent (incl. staff) | Rent GPU | Buy breakeven vs rent (months) | Own-room range (throughput uncertainty) |
@@ -18,7 +20,7 @@ The base levers are fixed: running 24/7, GST input credit claimed, no spare node
 | GLM-5.3 | mixed | 20.4 | mi355x / fp8 / 1 | 18.7 (mi355x) | 19.6 | mi355x fp8 | 37 | 20.4-20.4 (+/-10%; nodes 1-1) |
 | GLM-5.3 | agent_128k | 33.4 | mi355x / fp8 / 2 | 30.9 (mi355x) | 36.0 | mi355x fp8 | 31 | 33.4-33.4 (+/-10%; nodes 2-2) |
 | GLM-5.3 | agent_1m | 34.1 | mi355x / fp8 / 2 | 31.6 (mi355x) | 36.0 | mi355x fp8 | 32 | 34.1-34.1 (+/-10%; nodes 2-2) |
-| GLM-5.3 | stress_1m | 72.7 | mi355x / fp8 / 5 | 67.3 (mi355x) | 85.3 | mi355x fp8 | 28 | 72.7-72.7 (+/-10%; nodes 5-5) |
+| GLM-5.3 | stress_1m | 63.6 | mi355x / fp8 / 4 | 59.5 (mi355x) | 68.8 | mi355x fp8 | 32 | 63.6-72.7 (+/-10%; nodes 4-5) |
 | DeepSeek V4 Pro | chat | 20.3 | mi355x / native / 1 | 18.6 (mi355x) | 19.6 | mi355x native | 37 | 20.3-33.3 (+/-25%; nodes 1-2) |
 | DeepSeek V4 Pro | mixed | 33.3 | mi355x / native / 2 | 30.8 (mi355x) | 36.0 | mi355x native | 31 | 20.3-33.3 (+/-25%; nodes 1-2) |
 | DeepSeek V4 Pro | agent_128k | 33.3 | mi355x / native / 2 | 30.8 (mi355x) | 36.0 | mi355x native | 31 | 33.3-46.3 (+/-25%; nodes 2-3) |
@@ -61,7 +63,7 @@ Kimi is where the formula bites. Its native window is **262,144 tokens**, alread
 |---|---|---|---|---|---|---|
 | GLM-5.3 | agent_128k | 128,000 | 72,000 | 30% | 33.4 (mi355x fp8) | 2 |
 | GLM-5.3 | agent_1m | 960,000 | 496,000 | 7% | 34.1 (mi355x fp8) | 2 |
-| GLM-5.3 | stress_1m | 960,000 | 1,000,000 | 0% | 72.7 (mi355x fp8) | 5 |
+| GLM-5.3 | stress_1m | 960,000 | 1,000,000 | 0% | 63.6 (mi355x fp8) | 4 |
 | DeepSeek V4 Pro | agent_128k | 128,000 | 72,000 | 30% | 33.3 (mi355x native) | 2 |
 | DeepSeek V4 Pro | agent_1m | 960,000 | 496,000 | 7% | 46.4 (mi355x native) | 3 |
 | DeepSeek V4 Pro | stress_1m | 960,000 | 1,000,000 | 0% | 59.3 (mi355x native) | 4 |
@@ -90,16 +92,16 @@ For DeepSeek and Kimi, BF16 (and FP8 for Kimi) is therefore an **upcast**: it pa
 | GLM-5.3 | fp32 | 3,013 | NO (memory/cost only) | mi355x | 24 | 348.9 | 397.3 | 13.9 |
 | DeepSeek V4 Pro | native | 893 | yes | mi355x | 2 | 33.3 | 36.0 | 0.4 |
 | DeepSeek V4 Pro | fp8 | 1,606 | yes | mi355x | 3 | 46.3 | 52.5 | 0.4 |
-| DeepSeek V4 Pro | bf16 | 3,301 | yes | mi355x | 6 | 92.3 | 101.7 | 0.7 |
-| DeepSeek V4 Pro | fp32 | 6,602 | NO (memory/cost only) | mi355x | 42 | 604.4 | 693.0 | 1.4 |
+| DeepSeek V4 Pro | bf16 | 3,301 | yes | mi355x | 5 | 78.2 | 85.3 | 0.7 |
+| DeepSeek V4 Pro | fp32 | 6,602 | NO (memory/cost only) | mi355x | 40 | 575.8 | 659.9 | 1.4 |
 | Kimi K2.7 Code | native | 595 | yes | mi355x | 5 | 72.8 | 85.3 | 2.5 |
 | Kimi K2.7 Code | fp8 | 1,026 | yes | mi355x | 3 | 46.4 | 52.5 | 2.5 |
-| Kimi K2.7 Code | bf16 | 2,053 | yes | gb300nvl72 | 1 | 189.3 | 603.6 | 5.1 |
+| Kimi K2.7 Code | bf16 | 2,053 | yes | mi355x | 12 | 178.2 | 200.2 | 5.1 |
 | Kimi K2.7 Code | fp32 | 4,106 | NO (memory/cost only) | mi355x | 183 | 2,606.7 | 3,010.0 | 10.1 |
 
 Two results stand out. The first is that **Kimi's FP8 upcast is cheaper to serve than its native INT4** (three nodes against five). The model runs native INT4 through W4A16 kernels, which do the maths in BF16, so INT4 gets half the compute rate of FP8. On MI355X it is worse still: vLLM's W4A16 MoE path there "does not support expert parallelism" ([vLLM Kimi K2.7 Code recipe](https://github.com/vllm-project/recipes/blob/main/models/moonshotai/Kimi-K2.7-Code.yaml)). FP8 Kimi is a speed choice, not a quality one, and its accuracy should be checked against the INT4 original before it goes into production.
 
-The second is that **Kimi in BF16 needs a whole GB300 NVL72 rack** (₹189.3 lakh/month to own, ₹603.6 lakh to rent). That rack draws **132 kW nominal and about 155 kW at peak** and is fully liquid-cooled ([HPE GB300 NVL72](https://www.hpe.com/us/en/collaterals/collateral.a50009244enw.html)). That is far beyond what a Baner office floor can host.
+The second is that **Kimi in BF16 needs 12 MI355X nodes** (₹178.2 lakh/month to own, ₹200.2 lakh to rent), four times as many as its FP8 upcast. That is more than a Baner office's LT connection can supply: an HT connection becomes necessary at the 11th MI355X node (see the power section below).
 
 DeepSeek's tiny cache, 0.4 GB per user at 72k tokens, comes from its compressed CSA/HCA attention: 9.62 GiB per 1M-token sequence in BF16, against 83.9 GiB for a V3.2-style stack ([vLLM DeepSeek V4 blog](https://vllm.ai/blog/2026-04-24-deepseek-v4)). That is why DeepSeek fits 50 users on one node in every workload except the stress case. The deployments use an FP8 KV cache, which costs a little accuracy. On Kimi-K2.5, vLLM found the drop "modest in aggregate AUC but consistently negative across context lengths" ([vLLM FP8 KV-cache post](https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-04-22-fp8-kvcache.md)).
 
@@ -140,7 +142,7 @@ Each lever then moves the same configuration as follows.
 | Registered IT/ITeS unit (industrial tariff, duty-exempt) | 34.0 | 33.2 | 47.4 | 47.4 | 2 |
 | Rental prices fall 25%/yr | 36.3 | 33.2 | 47.4 | 37.3 | 2 |
 | Resale 0% (instead of 20%) | 40.1 | 37.0 | 47.4 | 47.4 | 2 |
-| TP attention instead of DP-attention | 94.8 | 86.6 | 135.8 | 135.8 | 6 |
+| TP attention instead of DP-attention | 54.4 | 49.9 | 69.4 | 69.4 | 3 |
 
 **24/7 vs business hours.** This is the only lever that makes renting cheapest: ₹26.9 lakh to rent against ₹32.4 lakh to own. The saving holds only on hourly on-demand capacity that is destroyed or stopped overnight. Monthly bare metal, reserved terms and DigitalOcean's powered-off-but-billed droplets save nothing ([DigitalOcean GPU pricing](https://www.digitalocean.com/pricing/gpu-droplets)). E2E bills hourly with no minimum ([E2E pricing](https://www.e2enetworks.com/pricing.md)). Yotta's B200 bare metal starts at a monthly term ([Yotta bare metal](https://shakticloud.ai/bare-metal-service/)).
 
@@ -150,7 +152,7 @@ Each lever then moves the same configuration as follows.
 
 **Rental price trend.** Buying is a bet that rental prices won't collapse. If rents fell 25% a year, average rent over the horizon would be ₹37.3 lakh, close to the ₹36.3 lakh own-room cost. The 2026 market points the other way. GPU rental is up about 18% year on year ([GetDeploying index](https://getdeploying.com/gpu-price-index)), and Nebius raised on-demand prices 17–21% on 1 Oct 2026 ([UsagePricing](https://usagepricing.com/blueprint/activity/nebius-ai-2026-09-24-gpu-price-increase)). The model therefore assumes no decline.
 
-**Engine configuration.** Serving with tensor-parallel attention instead of DP-attention plus expert parallelism triples the cost, from 2 to 6 nodes and ₹36.3 to ₹94.8 lakh. DP-attention is the recipe default for these MoE models ([SGLang GLM-5.3 cookbook](https://cookbook.sglang.io/autoregressive/GLM/GLM-5.3); [vLLM DeepSeek-V4-Pro recipe](https://github.com/vllm-project/recipes/blob/main/models/deepseek-ai/DeepSeek-V4-Pro.yaml)). Staff who know it are worth more than any hardware discount.
+**Engine configuration.** Serving with tensor-parallel attention instead of DP-attention plus expert parallelism raises the cost by about half, from 2 to 3 nodes and ₹36.3 to ₹54.4 lakh. DP-attention is the recipe default for these MoE models ([SGLang GLM-5.3 cookbook](https://cookbook.sglang.io/autoregressive/GLM/GLM-5.3); [vLLM DeepSeek-V4-Pro recipe](https://github.com/vllm-project/recipes/blob/main/models/deepseek-ai/DeepSeek-V4-Pro.yaml)). Staff who know it are worth more than any hardware discount.
 
 **The API as a sanity line.** The comparison below is my own arithmetic, using the model's agent mix of about 230 cached and 20 uncached input tokens per output token. At Z.ai's list prices of $1.40 input, $0.26 cached and $4.40 output per 1M tokens ([Z.ai pricing](https://docs.z.ai/guides/overview/pricing)), a million GLM-5.3 output tokens costs about $92, or roughly **₹8,776**. The own room delivers them at **₹6,107.65**, about 30% less. DeepSeek's own API, at $0.66 / $0.022 / $1.98 off-peak and double at peak ([DeepSeek pricing](https://api-docs.deepseek.com/quick_start/pricing)), comes to roughly ₹1,926–3,853 per million output tokens. That is 1.6–3.2 times cheaper than even the reference own room. So the case for self-hosting is **keeping code and data on Stark's own hardware, plus a predictable fixed bill**. It is not the cheapest price per token.
 
@@ -202,12 +204,12 @@ The software is also young. DeepSeek V4 Pro on MI355X went from **0.93 tok/s/use
 | Model | Workload | Own room | GPU / precision / nodes | Colo | Rent (incl. staff) | Rent GPU |
 |---|---|---|---|---|---|---|
 | GLM-5.3 | chat | 18.8 | h200 / fp8 / 1 | 17.2 (h200) | 16.4 | h200 fp8 |
-| GLM-5.3 | mixed | 36.2 | b200 / fp8 / 2 | 33.2 (b200) | 47.4 | b200 fp8 |
-| GLM-5.3 | agent_128k | 36.3 | b200 / fp8 / 2 | 33.2 (b200) | 47.4 | b200 fp8 |
-| GLM-5.3 | agent_1m | 64.6 | b300 / fp8 / 3 | 60.0 (b300) | 82.2 | h200 fp8 |
-| GLM-5.3 | stress_1m | 101.6 | b300 / fp8 / 5 | 94.4 (b300) | 179.9 | b200 fp8 |
+| GLM-5.3 | mixed | 32.5 | h200 / fp8 / 2 | 30.1 (h200) | 29.5 | h200 fp8 |
+| GLM-5.3 | agent_128k | 36.3 | b200 / fp8 / 2 | 33.2 (b200) | 42.7 | h200 fp8 |
+| GLM-5.3 | agent_1m | 55.1 | b200 / fp8 / 3 | 50.5 (b200) | 55.8 | h200 fp8 |
+| GLM-5.3 | stress_1m | 101.6 | b300 / fp8 / 5 | 94.4 (b300) | 161.1 | h200 fp8 |
 | DeepSeek V4 Pro | chat | 21.8 | b200 / native / 1 | 19.8 (b200) | 25.3 | b200 native |
-| DeepSeek V4 Pro | mixed | 36.2 | b200 / native / 2 | 33.1 (b200) | 47.4 | b200 native |
+| DeepSeek V4 Pro | mixed | 36.2 | b200 / native / 2 | 33.1 (b200) | 42.7 | h200 native |
 | DeepSeek V4 Pro | agent_128k | 51.0 | b200 / native / 3 | 46.5 (b200) | 69.5 | b200 native |
 | DeepSeek V4 Pro | agent_1m | 51.1 | b200 / native / 3 | 46.6 (b200) | 69.5 | b200 native |
 | DeepSeek V4 Pro | stress_1m | 80.3 | b200 / native / 5 | 73.2 (b200) | 113.7 | b200 native |
@@ -217,7 +219,7 @@ The software is also young. DeepSeek V4 Pro on MI355X went from **0.93 tok/s/use
 | Kimi K2.7 Code | agent_1m | 94.8 | b200 / fp8 / 6 | 86.6 (b200) | 135.8 | b200 fp8 |
 | Kimi K2.7 Code | stress_1m | 227.7 | b200 / fp8 / 15 | 206.6 (b200) | 334.7 | b200 fp8 |
 
-On NVIDIA hardware, **renting costs roughly 27–43% more than owning** for agents (₹47.4 vs ₹36.3 lakh for GLM-5.3 at 128k). For NVIDIA, India's cheapest rents are Yotta's B200 at ₹473/GPU-hour on a monthly term and ₹378 on 3 years ([Yotta bare metal](https://shakticloud.ai/bare-metal-service/)), against E2E's ₹759 on demand ([E2E pricing](https://www.e2enetworks.com/pricing.md)). Note one change in ranking: for DeepSeek V4 Pro, a 1M ceiling costs almost nothing extra on B200 (₹51.0 → ₹51.1 lakh), while on MI355X it adds a node. Long-context DeepSeek is a B200 job.
+On NVIDIA hardware, **renting costs roughly 1–43% more than owning** for agents (₹42.7 vs ₹36.3 lakh for GLM-5.3 at 128k, but only ₹55.8 vs ₹55.1 lakh at 1M, both rented on H200). For the mixed workload on two H200 nodes, renting is actually cheapest (₹29.5 lakh rent vs ₹32.5 own room and ₹30.1 colo), so renting can win at two nodes as well as one. For NVIDIA, India's cheapest rents are Yotta's B200 at ₹473/GPU-hour on a monthly term and ₹378 on 3 years ([Yotta bare metal](https://shakticloud.ai/bare-metal-service/)), against E2E's ₹759 on demand ([E2E pricing](https://www.e2enetworks.com/pricing.md)). Note one change in ranking: for DeepSeek V4 Pro, a 1M ceiling costs almost nothing extra on B200 (₹51.0 → ₹51.1 lakh), while on MI355X it adds a node. Long-context DeepSeek is a B200 job.
 
 **Throughput uncertainty.** None of these throughput figures was benchmarked by Stark. The model fits a per-sequence overhead to **12 published InferenceX and Lambda points**, with a **mean absolute residual of 2.9% and a maximum of 17.2%** (GLM-5.3 on H200). Six model/GPU pairs are measured: GLM-5.3 on B200, MI355X and H200; Kimi on H200 and B200; DeepSeek on B200. Every other pair borrows from its nearest measured neighbour and carries **±25%**, which is where the range column in the first table comes from. The bands are widest where nodes are many. Kimi agent_1m spans **₹59.4–98.8 lakh (4–7 nodes)** and DeepSeek agent_1m spans **₹33.4–59.4 lakh (2–4 nodes)**. Published numbers also move quickly, with DeepSeek on GB300 improving about 5× between April and June 2026 ([PyTorch / SGLang GB300](https://pytorch.org/blog/serving-deepseek-v4-on-gb300-with-sglang-5x-higher-throughput-at-the-same-interactivity-since-day-0/)). A one-week rented benchmark of the shortlisted model/GPU pair on Stark's own agent traces is the cheapest way to narrow the band.
 
@@ -248,6 +250,6 @@ Most of the remaining uncertainty sits in a few prices that nobody publishes. Th
 
 ## Conclusion
 
-The decision splits by workload, not by model. Chat, anything that fits on one node, and anything that runs only in office hours should be rented. Indian clouds bill B200 and H200 by the hour, and a single rented H200 node at ₹16.4 lakh beats owning one. Always-on coding agents are the only case where owning pays back inside three years. Colocation beats a Baner server room on every row, so an own room makes sense only if keeping data on Stark's own premises is a hard requirement. For an agent fleet, compaction at 128k, DP-attention serving and native precision each matter more than the choice of GPU vendor. The TP-attention mistake alone triples the bill, and a full 1M window can add two nodes for Kimi.
+The decision splits by workload, not by model. Chat, anything that fits on one node, and anything that runs only in office hours should be rented. Indian clouds bill B200 and H200 by the hour, and a single rented H200 node at ₹16.4 lakh beats owning one. Always-on coding agents are the only case where owning pays back inside three years. Colocation beats a Baner server room on every row, so an own room makes sense only if keeping data on Stark's own premises is a hard requirement. For an agent fleet, compaction at 128k, DP-attention serving and native precision each matter more than the choice of GPU vendor. The TP-attention mistake alone adds about half to the bill, and a full 1M window can add two nodes for Kimi.
 
 Two results go against intuition. First, self-hosting GLM-5.3 beats Z.ai's list API by about 30% per output token, but the same reference room costs 1.6–3.2 times DeepSeek's own API price per output token. The business case for self-hosting therefore rests on keeping code on Stark's own hardware and on a fixed monthly bill, not on token price. Second, the cheapest hardware on paper, MI355X, has the least reliable prices and benchmarks in the data. The sensible order is: get INR quotes for B200 and MI355X, rent each for a week to benchmark Stark's own agent traces, and only then commit capex. That fits naturally around the import authorisation that expires on 31 Dec 2026.

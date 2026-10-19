@@ -26,8 +26,13 @@ def bench_row(d, model, gpu, pt, e_bw, e_seq):
     return row
 
 
+def c1(v):
+    """The benchmark ran one replica on exactly tp_gpus GPUs: use replica-size candidate 1."""
+    return {**v, **{k[:-3]: x for k, x in v.items() if k.endswith("_c1")}}
+
+
 def predict(d, model, gpu, pt, e_bw, e_seq):
-    v = run_llm(bench_row(d, model, gpu, pt, e_bw, e_seq))
+    v = c1(run_llm(bench_row(d, model, gpu, pt, e_bw, e_seq)))
     b = pt["conc"]
     cov = 1 - v["cov_q"] ** (b * v["m_mtp_accept"])
     stp = v["t_wr"] + v["t_we"] * cov + v["t_lat"] + b * v["t_seq"]

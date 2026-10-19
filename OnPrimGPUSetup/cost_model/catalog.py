@@ -231,7 +231,8 @@ LLM = LEVERS + [
     _m("kv_seq_gb", "(ctx_mean * m_kv_tok_b + m_kv_seq_fixed_b) / 1e9", "GB", "KV per sequence at mean context"),
     _m("gpus_rep_min", "iff(e_dp_attn == 1, iff(fits_repl == 1, (m_weights_gb - m_repl_gb + e_min_batch * kv_seq_gb) / max(0.001, usable_gb - m_repl_gb), 1e9), g_per_node * (m_weights_gb / g_per_node + e_min_batch * kv_seq_gb) / usable_gb)", "GPUs",
        "GPUs a replica needs for weights + minimum batch (DP-attention: replicated non-expert weights; TP: KV replicated within a node)"),
-    _m("nodes_rep", "max(1, ceil(gpus_rep_min / g_per_node))", "nodes", "Nodes per replica"),
+    _m("nodes_rep_min", "max(1, ceil(gpus_rep_min / g_per_node))", "nodes", "Fewest nodes one replica's weights fit on"),
+    _m("nodes_rep", "nodes_rep_min", "nodes", "Nodes per replica (replaced by the replica-size search below)"),
     _m("gpus_rep", "nodes_rep * g_per_node", "GPUs", "GPUs per replica"),
     _m("kv_shards", "iff(e_dp_attn == 1, gpus_rep, nodes_rep)", "x", "Ways the KV cache is split (DP: every GPU; TP: per node/pipeline stage)"),
     _m("w_per_gpu_gb", "iff(e_dp_attn == 1, m_repl_gb + (m_weights_gb - m_repl_gb) / gpus_rep, m_weights_gb / gpus_rep)", "GB", "Weights resident per GPU"),
@@ -436,3 +437,49 @@ OCR = LEVERS + [
     _q("q_per_1k_room", "q_room_m / max(1, q_pages_m / 1000)", "INR/1k pages", "Bought, per 1,000 pages"),
     _q("q_feasible", "q_deployable", "0/1", "Deployable"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Replica-size search. A replica can span more nodes than its weights need:
+# spreading weights over more GPUs frees HBM for KV (memory-bound cases) at the
+# cost of cross-node latency. The per-replica chain below is cloned for
+# candidates nodes_rep_min + 0..REP_CANDIDATES-1, and the candidate needing the
+# fewest nodes (incl. spare, infeasible speed penalised) is selected.
+# ---------------------------------------------------------------------------
+import re as _re
+
+REP_CANDIDATES = 3
+_REP_CHAIN = ["nodes_rep", "gpus_rep", "kv_shards", "w_per_gpu_gb", "kv_cap_gb", "rep_mem", "lat_us", "t_wr", "t_we",
+              "t_lat", "t_kv", "t_c", "t_pf", "t_ovh", "t_seq", "t_fix0", "b_nt1", "b_nt2", "b_nt3", "b_nt4", "b_nt5",
+              "b_dec_raw", "speed_ok", "b_dec", "rep_dec"]
+
+
+def _rep_search(formulas):
+    by = {f.name: f for f in formulas}
+    pat = _re.compile(r"\b(" + "|".join(_REP_CHAIN) + r")\b")
+    clones, sel = [], []
+    for k in range(1, REP_CANDIDATES + 1):
+        sub = lambda e, k=k: pat.sub(lambda m: f"{m.group(1)}_c{k}", e)
+        for n in _REP_CHAIN:
+            f = by[n]
+            expr = f"nodes_rep_min + {k - 1}" if n == "nodes_rep" else sub(f.expr)
+            clones.append(Formula(f"{n}_c{k}", expr, f.unit, f"{f.desc} [candidate {k}: nodes_rep_min + {k - 1}]", "replica search"))
+        clones.append(Formula(f"rep_tot_c{k}", f"(max(rep_mem_c{k}, rep_dec_c{k}) + s_spare) * nodes_rep_c{k} + iff(speed_ok_c{k} == 1, 0, 1000000)",
+                              "nodes", f"Total nodes with candidate {k} (infeasible speed penalised)", "replica search"))
+    best = "min(" + ", ".join(f"rep_tot_c{k}" for k in range(1, REP_CANDIDATES + 1)) + ")"
+    clones.append(Formula("rep_tot_best", best, "nodes", "Fewest total nodes over replica-size candidates", "replica search"))
+    pick = str(REP_CANDIDATES)
+    for k in range(REP_CANDIDATES - 1, 0, -1):
+        pick = f"iff(rep_tot_c{k} == rep_tot_best, {k}, {pick})"
+    clones.append(Formula("rep_sel", pick, "candidate", "Chosen replica-size candidate (smallest on ties)", "replica search"))
+    for n in _REP_CHAIN:
+        f = by[n]
+        e = f"{n}_c{REP_CANDIDATES}"
+        for k in range(REP_CANDIDATES - 1, 0, -1):
+            e = f"iff(rep_sel == {k}, {n}_c{k}, {e})"
+        sel.append(Formula(n, e, f.unit, f.desc + " (chosen candidate)", f.group))
+    out = [f for f in formulas if f.name not in _REP_CHAIN]
+    return out + clones + sel
+
+
+LLM = _rep_search(LLM)

@@ -14,7 +14,7 @@ Monthly buy/colo cost = capex x capital-recovery factor (11%, 20% resale) + opex
 | GLM-5.3 | mixed | 20.4 | mi355x / fp8 / 1 | 18.7 (mi355x) | 19.6 | mi355x fp8 | 37 | 20.4-20.4 (+/-10%; nodes 1-1) |
 | GLM-5.3 | agent_128k | 33.4 | mi355x / fp8 / 2 | 30.9 (mi355x) | 36.0 | mi355x fp8 | 31 | 33.4-33.4 (+/-10%; nodes 2-2) |
 | GLM-5.3 | agent_1m | 34.1 | mi355x / fp8 / 2 | 31.6 (mi355x) | 36.0 | mi355x fp8 | 32 | 34.1-34.1 (+/-10%; nodes 2-2) |
-| GLM-5.3 | stress_1m | 72.7 | mi355x / fp8 / 5 | 67.3 (mi355x) | 85.3 | mi355x fp8 | 28 | 72.7-72.7 (+/-10%; nodes 5-5) |
+| GLM-5.3 | stress_1m | 63.6 | mi355x / fp8 / 4 | 59.5 (mi355x) | 68.8 | mi355x fp8 | 32 | 63.6-72.7 (+/-10%; nodes 4-5) |
 | DeepSeek V4 Pro | chat | 20.3 | mi355x / native / 1 | 18.6 (mi355x) | 19.6 | mi355x native | 37 | 20.3-33.3 (+/-25%; nodes 1-2) |
 | DeepSeek V4 Pro | mixed | 33.3 | mi355x / native / 2 | 30.8 (mi355x) | 36.0 | mi355x native | 31 | 20.3-33.3 (+/-25%; nodes 1-2) |
 | DeepSeek V4 Pro | agent_128k | 33.3 | mi355x / native / 2 | 30.8 (mi355x) | 36.0 | mi355x native | 31 | 33.3-46.3 (+/-25%; nodes 2-3) |
@@ -71,12 +71,12 @@ Monthly buy/colo cost = capex x capital-recovery factor (11%, 20% resale) + opex
 | Model | Workload | Own room Rs lakh/mo | GPU / precision / nodes | Colo | Rent (incl. staff) | Rent GPU |
 |---|---|---|---|---|---|---|
 | GLM-5.3 | chat | 18.8 | h200 / fp8 / 1 | 17.2 (h200) | 16.4 | h200 fp8 |
-| GLM-5.3 | mixed | 36.2 | b200 / fp8 / 2 | 33.2 (b200) | 47.4 | b200 fp8 |
-| GLM-5.3 | agent_128k | 36.3 | b200 / fp8 / 2 | 33.2 (b200) | 47.4 | b200 fp8 |
-| GLM-5.3 | agent_1m | 64.6 | b300 / fp8 / 3 | 60.0 (b300) | 82.2 | h200 fp8 |
-| GLM-5.3 | stress_1m | 101.6 | b300 / fp8 / 5 | 94.4 (b300) | 179.9 | b200 fp8 |
+| GLM-5.3 | mixed | 32.5 | h200 / fp8 / 2 | 30.1 (h200) | 29.5 | h200 fp8 |
+| GLM-5.3 | agent_128k | 36.3 | b200 / fp8 / 2 | 33.2 (b200) | 42.7 | h200 fp8 |
+| GLM-5.3 | agent_1m | 55.1 | b200 / fp8 / 3 | 50.5 (b200) | 55.8 | h200 fp8 |
+| GLM-5.3 | stress_1m | 101.6 | b300 / fp8 / 5 | 94.4 (b300) | 161.1 | h200 fp8 |
 | DeepSeek V4 Pro | chat | 21.8 | b200 / native / 1 | 19.8 (b200) | 25.3 | b200 native |
-| DeepSeek V4 Pro | mixed | 36.2 | b200 / native / 2 | 33.1 (b200) | 47.4 | b200 native |
+| DeepSeek V4 Pro | mixed | 36.2 | b200 / native / 2 | 33.1 (b200) | 42.7 | h200 native |
 | DeepSeek V4 Pro | agent_128k | 51.0 | b200 / native / 3 | 46.5 (b200) | 69.5 | b200 native |
 | DeepSeek V4 Pro | agent_1m | 51.1 | b200 / native / 3 | 46.6 (b200) | 69.5 | b200 native |
 | DeepSeek V4 Pro | stress_1m | 80.3 | b200 / native / 5 | 73.2 (b200) | 113.7 | b200 native |
@@ -95,11 +95,11 @@ Monthly buy/colo cost = capex x capital-recovery factor (11%, 20% resale) + opex
 | GLM-5.3 | fp32 | 3,013 | NO (memory/cost only) | mi355x | 24 | 348.9 | 397.3 | 13.9 |
 | DeepSeek V4 Pro | native | 893 | yes | mi355x | 2 | 33.3 | 36.0 | 0.4 |
 | DeepSeek V4 Pro | fp8 | 1,606 | yes | mi355x | 3 | 46.3 | 52.5 | 0.4 |
-| DeepSeek V4 Pro | bf16 | 3,301 | yes | mi355x | 6 | 92.3 | 101.7 | 0.7 |
-| DeepSeek V4 Pro | fp32 | 6,602 | NO (memory/cost only) | mi355x | 42 | 604.4 | 693.0 | 1.4 |
+| DeepSeek V4 Pro | bf16 | 3,301 | yes | mi355x | 5 | 78.2 | 85.3 | 0.7 |
+| DeepSeek V4 Pro | fp32 | 6,602 | NO (memory/cost only) | mi355x | 40 | 575.8 | 659.9 | 1.4 |
 | Kimi K2.7 Code | native | 595 | yes | mi355x | 5 | 72.8 | 85.3 | 2.5 |
 | Kimi K2.7 Code | fp8 | 1,026 | yes | mi355x | 3 | 46.4 | 52.5 | 2.5 |
-| Kimi K2.7 Code | bf16 | 2,053 | yes | gb300nvl72 | 1 | 189.3 | 603.6 | 5.1 |
+| Kimi K2.7 Code | bf16 | 2,053 | yes | mi355x | 12 | 178.2 | 200.2 | 5.1 |
 | Kimi K2.7 Code | fp32 | 4,106 | NO (memory/cost only) | mi355x | 183 | 2,606.7 | 3,010.0 | 10.1 |
 
 ## Lever sensitivity on GLM-5.3 FP8, 8xB200, agent_128k, 90 users, 30 tok/s
@@ -114,7 +114,7 @@ Monthly buy/colo cost = capex x capital-recovery factor (11%, 20% resale) + opex
 | Registered IT/ITeS unit (industrial tariff, duty-exempt) | 34.0 | 33.2 | 47.4 | 47.4 | 2 |
 | Rental prices fall 25%/yr | 36.3 | 33.2 | 47.4 | 37.3 | 2 |
 | Resale 0% (instead of 20%) | 40.1 | 37.0 | 47.4 | 47.4 | 2 |
-| TP attention instead of DP-attention | 94.8 | 86.6 | 135.8 | 135.8 | 6 |
+| TP attention instead of DP-attention | 54.4 | 49.9 | 69.4 | 69.4 | 3 |
 
 ## Cost breakdown, same reference config (own room, 24/7)
 
@@ -147,7 +147,7 @@ Monthly buy/colo cost = capex x capital-recovery factor (11%, 20% resale) + opex
 |---|---|---|---|---|---|---|
 | GLM-5.3 | agent_128k | 128,000 | 72,000 | 30% | 33.4 (mi355x fp8) | 2 |
 | GLM-5.3 | agent_1m | 960,000 | 496,000 | 7% | 34.1 (mi355x fp8) | 2 |
-| GLM-5.3 | stress_1m | 960,000 | 1,000,000 | 0% | 72.7 (mi355x fp8) | 5 |
+| GLM-5.3 | stress_1m | 960,000 | 1,000,000 | 0% | 63.6 (mi355x fp8) | 4 |
 | DeepSeek V4 Pro | agent_128k | 128,000 | 72,000 | 30% | 33.3 (mi355x native) | 2 |
 | DeepSeek V4 Pro | agent_1m | 960,000 | 496,000 | 7% | 46.4 (mi355x native) | 3 |
 | DeepSeek V4 Pro | stress_1m | 960,000 | 1,000,000 | 0% | 59.3 (mi355x native) | 4 |

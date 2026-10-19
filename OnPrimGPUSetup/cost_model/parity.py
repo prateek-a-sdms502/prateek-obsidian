@@ -44,12 +44,19 @@ def matrix_values(wb):
 
 def recalc(path):
     """Return (rows of the Matrix sheet as dicts, engine name)."""
-    if shutil.which("soffice") or shutil.which("libreoffice"):
-        out = subprocess.run([sys.executable, str(RECALC), str(path), "600"], capture_output=True, text=True)
-        res = json.loads(out.stdout)
-        if res.get("status") != "success":
-            raise SystemExit(f"recalc problem: {json.dumps(res)[:2000]}")
-        return list(matrix_values(load_workbook(path, data_only=True))), "LibreOffice"
+    lo = shutil.which("soffice") or shutil.which("libreoffice")
+    if lo:
+        # snap LibreOffice can only see non-hidden paths under $HOME, so convert inside cost_model/out/
+        work = HERE / "out" / "lo_parity"
+        work.mkdir(parents=True, exist_ok=True)
+        src = work / "in.xlsx"
+        shutil.copy(path, src)
+        subprocess.run([lo, "--headless", "--calc", "--convert-to", "xlsx", "--outdir", str(work / "done"), str(src)],
+                       capture_output=True, text=True, timeout=1800)
+        res = work / "done" / "in.xlsx"
+        if not res.exists():
+            raise SystemExit("LibreOffice did not produce a recalculated file")
+        return list(matrix_values(load_workbook(res, data_only=True))), "LibreOffice"
     import re
     import formulas
     from openpyxl.utils import column_index_from_string
