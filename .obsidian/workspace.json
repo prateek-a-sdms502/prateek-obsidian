@@ -25,7 +25,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "19th Oct 2026.md",
+                "file": "Daily Log/19th Oct 2026.md",
                 "mode": "source",
                 "source": false
               },
@@ -201,7 +201,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "6206fc4be257135e",
+  "active": "b4aa4691582924df",
   "lastOpenFiles": [
     "suraksha_ai_pipeline.md",
     "Untitled.md",
@@ -222,7 +222,7 @@
     "cost_model/out/lo_parity/done/lu127506944q1.tmp",
     "cost_model/out/lo_parity/done",
     "OnPrimGPUSetup/reports/Self hosting LLM cost Pune.md",
-    "19th Oct 2026.md",
-    "16th Oct 2026.md"
+    "Daily Log/19th Oct 2026.md",
+    "Daily Log/16th Oct 2026.md"
   ]
 }
