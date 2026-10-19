@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from dsl import compile_py
-from formulas import INPUTS, LLM, OCR, OCR_INPUTS
+from catalog import INPUTS, LLM, OCR, OCR_INPUTS
 from inputs import ROW_KEYS, Data
 
 OUT = Path(__file__).parent / "out"

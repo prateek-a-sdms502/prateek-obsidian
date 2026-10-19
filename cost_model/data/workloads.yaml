@@ -26,8 +26,8 @@ workloads:
     w_ctx_mean: {value: 44500, source: "Mixture of chat (12k) and agent saw-tooth (mean 72k) weighted by active sequences"}
     w_ctx_sd: {value: 38700, source: "Mixture std-dev (chat sd 10k, agent sd 32.3k)"}
     w_stress: 0
-    w_uncached_per_out: {value: 4.2, source: "Mixture of chat (2) and agent (6)"}
-    w_cached_per_out: {value: 30, source: "Mixture of chat (12) and agent (45)"}
+    w_uncached_per_out: {value: 11.7, source: "Mixture of chat (2) and agent (20), weighted 0.459/0.541 by active sequences"}
+    w_cached_per_out: {value: 130, source: "Mixture of chat (12) and agent (230)"}
     w_presence: {value: 0.6, source: ASSUMPTION}
     w_turn_uncached: {value: 4000, source: ASSUMPTION}
     w_out_share: {value: 0.20, source: ASSUMPTION}
@@ -43,15 +43,15 @@ workloads:
     w_ctx_mean: 0
     w_ctx_sd: 0
     w_stress: 0
-    w_uncached_per_out: {value: 6.0, source: "ASSUMPTION: input:output ~50:1 with ~88% prefix-cache hit"}
-    w_cached_per_out: {value: 45, source: ASSUMPTION}
+    w_uncached_per_out: {value: 20.0, source: "Agentic traces: median input 88-142k, output ~400 tokens/request; DSv4 on B300 hit 91% HBM + 1.4% DRAM prefix cache -> ~20-25 uncached tokens per output token"}
+    w_cached_per_out: {value: 230, source: "Agentic traces (InferenceX AgentX): ~250 input tokens per output token, ~91% cached"}
     w_presence: {value: 0.6, source: ASSUMPTION}
     w_turn_uncached: {value: 8000, source: ASSUMPTION}
-    w_out_share: {value: 0.15, source: "ASSUMPTION: most context growth is tool output and file reads"}
+    w_out_share: {value: 0.12, source: "ASSUMPTION: ~400 output tokens per turn vs ~3k new tool-output/file tokens"}
     c_ceiling: 1000000
     c_trigger: 128000
     c_floor: 16000
-    c_summary_out: 8000
+    c_summary_out: 4000
     c_reserve: 40000
   agent_1m:
     label: Coding agents, full 1M window (compaction only near the limit)
@@ -60,15 +60,15 @@ workloads:
     w_ctx_mean: 0
     w_ctx_sd: 0
     w_stress: 0
-    w_uncached_per_out: {value: 6.0, source: ASSUMPTION}
-    w_cached_per_out: {value: 45, source: ASSUMPTION}
+    w_uncached_per_out: {value: 20.0, source: "As agent_128k"}
+    w_cached_per_out: {value: 230, source: "As agent_128k"}
     w_presence: {value: 0.6, source: ASSUMPTION}
     w_turn_uncached: {value: 8000, source: ASSUMPTION}
-    w_out_share: {value: 0.15, source: ASSUMPTION}
+    w_out_share: {value: 0.12, source: "As agent_128k"}
     c_ceiling: 1000000
     c_trigger: 960000
     c_floor: 32000
-    c_summary_out: 12000
+    c_summary_out: 8000
     c_reserve: 40000
   stress_1m:
     label: Worst case - every user active at the context ceiling at once
@@ -77,13 +77,30 @@ workloads:
     w_ctx_mean: 0
     w_ctx_sd: 0
     w_stress: 1
-    w_uncached_per_out: {value: 6.0, source: ASSUMPTION}
-    w_cached_per_out: {value: 45, source: ASSUMPTION}
+    w_uncached_per_out: {value: 20.0, source: "As agent_128k"}
+    w_cached_per_out: {value: 230, source: "As agent_128k"}
     w_presence: 1.0
     w_turn_uncached: {value: 8000, source: ASSUMPTION}
-    w_out_share: 0.15
+    w_out_share: 0.12
     c_ceiling: 1000000
     c_trigger: 960000
     c_floor: 32000
-    c_summary_out: 12000
+    c_summary_out: 8000
+    c_reserve: 40000
+  bench_8k1k:
+    label: Calibration only - InferenceX fixed shape 8k in / 1k out, every user always active
+    w_duty: 1.0
+    w_sawtooth: 0
+    w_ctx_mean: 8704
+    w_ctx_sd: 0
+    w_stress: 0
+    w_uncached_per_out: 8.0
+    w_cached_per_out: 0
+    w_presence: 1.0
+    w_turn_uncached: 8192
+    w_out_share: 0.11
+    c_ceiling: 1000000
+    c_trigger: 1000000
+    c_floor: 16000
+    c_summary_out: 0
     c_reserve: 40000

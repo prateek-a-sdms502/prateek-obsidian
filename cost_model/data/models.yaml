@@ -6,6 +6,8 @@ models:
   glm53:
     label: GLM-5.3 (Z.ai) - 753B total / ~40B active MoE, MLA + DSA sparse attention
     m_active_b: {value: 40, source: "GLM-5 card 744B/40B active; vLLM recipe 743B/39B", url: "https://huggingface.co/zai-org/GLM-5"}
+    m_experts: {value: 256, source: "config.json n_routed_experts"}
+    m_topk: {value: 8, source: "config.json num_experts_per_tok"}
     m_layers: {value: 78, source: "config.json num_hidden_layers (+1 MTP layer)", url: "https://huggingface.co/zai-org/GLM-5.3-BF16/raw/main/config.json"}
     m_native_ctx: {value: 1048576, source: "config.json max_position_embeddings; vLLM recipe: native 1M window", url: "https://github.com/vllm-project/recipes/blob/main/models/zai-org/GLM-5.3.yaml"}
     m_ops_per_layer: {value: 2, source: "Two collectives per layer at decode (attention + MoE all-reduce / dispatch-combine)"}
@@ -45,6 +47,8 @@ models:
   dsv4pro:
     label: DeepSeek V4 Pro (0813) - 1.65T total / 49B active MoE, CSA/HCA hybrid attention
     m_active_b: {value: 49, source: "Model card: 1.6T parameters (49B activated)", url: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro"}
+    m_experts: {value: 384, source: "config.json n_routed_experts"}
+    m_topk: {value: 6, source: "config.json num_experts_per_tok"}
     m_layers: {value: 61, source: "config.json num_hidden_layers (30 CSA c4a + 31 HCA c128a)", url: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/raw/main/config.json"}
     m_native_ctx: {value: 1048576, source: "config.json max_position_embeddings (YaRN x16 over 65,536)"}
     m_ops_per_layer: {value: 2, source: "Two collectives per layer at decode"}
@@ -96,6 +100,8 @@ models:
   kimi27:
     label: Kimi K2.7 Code (Moonshot) - 1T total / 32B active MoE, MLA, 262K native window
     m_active_b: {value: 32, source: "Model card: 1T total / 32B active", url: "https://huggingface.co/moonshotai/Kimi-K2.7-Code"}
+    m_experts: {value: 384, source: "config.json n_routed_experts"}
+    m_topk: {value: 8, source: "config.json num_experts_per_tok"}
     m_layers: {value: 61, source: "config.json (1 dense + 60 MoE)"}
     m_native_ctx: {value: 262144, source: "config.json; includes YaRN x64 over 4,096; no official support beyond"}
     m_ops_per_layer: {value: 2, source: "Two collectives per layer at decode"}

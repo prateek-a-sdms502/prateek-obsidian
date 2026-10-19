@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from dsl import to_js, toposort
-from formulas import INPUTS, LLM, OCR, OCR_INPUTS
+from catalog import INPUTS, LLM, OCR, OCR_INPUTS
 from inputs import Data, val
 
 OUT = Path(__file__).parent / "out"

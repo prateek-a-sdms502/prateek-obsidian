@@ -1,0 +1,43 @@
+# Published measurements used to calibrate the decode model.
+# Method: e_bw_eff is fixed per GPU family (below); e_seq_us (per-sequence overhead per emitted token,
+# 8-GPU-replica equivalent) is least-squares fitted per model x GPU over all its points.
+# InferenceX points: fixed 8k in / 1k out, tok/s/user = 1000/TPOT.
+# Source: research_notes/Self hosting LLM cost Pune/inference_performance.md
+gpu_bw_eff:
+  h200: 0.50
+  b200: 0.45
+  b300: 0.45
+  gb300nvl72: 0.45
+  mi355x: 0.60
+sets:
+  glm53/b200:
+    - {precision: fp8, tp_gpus: 8, dp_attn: 0, accept: 1.0, conc: 64, tok_s_user: 18.42, src: "InferenceX GLM-5 FP8 B200 TP8 SGLang 0.5.12, MTP off (2026-05-20)"}
+    - {precision: fp8, tp_gpus: 8, dp_attn: 0, accept: 1.0, conc: 128, tok_s_user: 11.87, src: "same"}
+    - {precision: fp8, tp_gpus: 8, dp_attn: 0, accept: 1.95, conc: 64, tok_s_user: 23.56, src: "InferenceX GLM-5 FP8 B200 TP8, EAGLE 3/1/4 (2026-05-25)"}
+    - {precision: fp8, tp_gpus: 8, dp_attn: 0, accept: 1.95, conc: 128, tok_s_user: 13.78, src: "same"}
+  glm53/mi355x:
+    - {precision: fp8, tp_gpus: 4, dp_attn: 0, accept: 1.0, conc: 64, tok_s_user: 11.83, src: "InferenceX GLM-5 FP8 MI355X TP4 SGLang ROCm, MTP off (2026-05-20)"}
+    - {precision: fp8, tp_gpus: 4, dp_attn: 0, accept: 1.0, conc: 128, tok_s_user: 7.33, src: "same"}
+  glm53/h200:
+    - {precision: fp8, tp_gpus: 8, dp_attn: 0, accept: 1.95, conc: 32, tok_s_user: 24.90, src: "InferenceX GLM-5 FP8 H200 TP8, EAGLE 3/1/4 (2026-05-25)"}
+    - {precision: fp8, tp_gpus: 8, dp_attn: 0, accept: 1.95, conc: 64, tok_s_user: 20.80, src: "same"}
+  kimi27/h200:
+    - {precision: native, tp_gpus: 8, dp_attn: 0, accept: 1.0, conc: 32, tok_s_user: 28.86, src: "InferenceX Kimi K2.5/2.6 INT4 H200 TP8 vLLM 0.21 (2026-05-19)"}
+    - {precision: native, tp_gpus: 8, dp_attn: 0, accept: 1.0, conc: 64, tok_s_user: 16.67, src: "same"}
+  kimi27/b200:
+    - {precision: native, tp_gpus: 8, dp_attn: 0, accept: 1.0, conc: 64, tok_s_user: 26.01, src: "InferenceX Kimi K2.5/2.6 INT4 B200 TP8 vLLM 0.21 (2026-05-19)"}
+  dsv4pro/b200:
+    - {precision: native, tp_gpus: 8, dp_attn: 1, accept: 1.66, conc: 32, tok_s_user: 28.5, ctx: 9216, uncached: 4.0, src: "Lambda DSv4 Pro B200 DP8+EP vLLM, 8k/2k, MTP 2 ~33% acceptance"}
+# model x GPU pairs without data inherit from the closest measured pair
+inherit:
+  glm53/b300: glm53/b200
+  glm53/gb300nvl72: glm53/b200
+  kimi27/b300: kimi27/b200
+  kimi27/gb300nvl72: kimi27/b200
+  kimi27/mi355x: kimi27/b200
+  dsv4pro/h200: dsv4pro/b200
+  dsv4pro/b300: dsv4pro/b200
+  dsv4pro/gb300nvl72: dsv4pro/b200
+  dsv4pro/mi355x: dsv4pro/b200
+# Not used for fitting: DSv4 Pro FP4 MI355X TP8 (May 2026, AMD branch, since improved >2x via ATOM/MoRI):
+#   conc 64 16.79, conc 128 13.76 tok/s/user.

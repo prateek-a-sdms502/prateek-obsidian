@@ -1,77 +1,86 @@
-# Scalar inputs. PLACEHOLDER entries get replaced from the research notes.
+# Scalar inputs, Oct 2026. Notes: research_notes/Self hosting LLM cost Pune/*.md
+# (cloud_rental_prices, hardware_prices, india_import_tax, pune_facility_colo).
+# Facility equipment and works prices are ex-GST; GST is applied by the formulas.
 globals:
   # scenario
-  s_fx: {value: 95.0, source: PLACEHOLDER}
+  s_fx: {value: 95.18, source: "INR per USD, open.er-api.com (E2E lists imply 95.0, Oracle 95.5)", date: "2026-10-19"}
   s_bh_hours: {value: 220, source: "10 h/day x 22 working days"}
-  s_usage_hours: {value: 220, source: "Users present ~10 h/day x 22 days even when the system runs 24/7"}
+  s_usage_hours: {value: 220, source: "ASSUMPTION: users present ~10 h/day x 22 days even when the system runs 24/7"}
+  s_it_tariff: {value: 1, source: "Lever: 1 = registered IT/ITeS or data-centre unit (Maharashtra IT/ITeS Policy 2023: industrial tariff + electricity-duty exemption); 0 = HT commercial"}
   # cloud extras
-  p_storage_tb_inr: {value: 2500, source: PLACEHOLDER}
-  p_cloud_gst: {value: 0.18, source: PLACEHOLDER}
+  p_storage_tb_inr: {value: 2000, source: "ASSUMPTION: block/NFS storage ~Rs2,000 per TB-month for weights"}
+  p_cloud_gst: {value: 0.18, source: "18% GST (Indian providers & AWS/GCP India entities); 18% IGST under reverse charge on foreign billing, creditable"}
   p_warmup_h: {value: 0.75, source: "ASSUMPTION: daily cold start (instance + 0.6-1.6 TB weight load + warm-up) billed in business-hours mode"}
   p_days: {value: 22, source: "Working days per month"}
-  p_rent_decline: {value: 0.25, source: PLACEHOLDER}
+  p_rent_decline: {value: 0.0, source: "No decline assumed: H100 fell ~33% (late 2024-25) but GPU rental rose ~18% YoY in 2026 (B200 +79% in 3 months; Nebius +17-21% on 1 Oct 2026); no credible 2027-28 forecast found"}
+  p_staff_inr_24: {value: 320000, source: "1 MLOps engineer (Rs28 LPA typical Pune) x 1.2 loading + 15% on-call allowance (pune_facility_colo.md)"}
+  p_staff_inr_bh: {value: 280000, source: "1 MLOps engineer (Rs28 LPA) x 1.2 loading"}
   # tax & import
-  t_freight: {value: 0.04, source: "Air freight + insurance 3-5% of FOB (hardware_prices.md)"}
-  t_landing: {value: 0.01, source: PLACEHOLDER}
-  t_bcd_srv: {value: 0.0, source: PLACEHOLDER}
-  t_bcd_net: {value: 0.20, source: PLACEHOLDER}
-  t_sws: {value: 0.10, source: PLACEHOLDER}
-  t_igst: {value: 0.18, source: PLACEHOLDER}
-  t_clear_inr: {value: 150000, source: PLACEHOLDER}
-  t_fx_spread: {value: 0.01, source: PLACEHOLDER}
-  t_itc_lag_m: {value: 2, source: PLACEHOLDER}
-  t_tax_rate: {value: 0.2517, source: PLACEHOLDER}
-  t_dep_wdv: {value: 0.40, source: PLACEHOLDER}
+  t_freight: {value: 0.015, source: "Air freight + insurance ~0.5-1.5% of FOB for servers (per-kg estimate; customs insurance fallback 1.125%)"}
+  t_landing: {value: 0.0, source: "1% notional landing charge abolished in 2017"}
+  t_bcd_srv: {value: 0.0, source: "BCD 0% on servers/GPU boards/storage (WTO ITA-1; HS 8471/8473)", date: "2026"}
+  t_bcd_net: {value: 0.10, source: "BCD 10% on Ethernet/IB switches (cut from 20% in Budget 2025); optics 10-20% disputed"}
+  t_sws: {value: 0.10, source: "Social Welfare Surcharge = 10% of BCD"}
+  t_igst: {value: 0.18, source: "IGST/GST 18% on all items here after GST 2.0 (22 Sep 2025)"}
+  t_clear_inr: {value: 150000, source: "ASSUMPTION: customs broker, port handling, DGFT import authorisation (HS 8471, in force to 31 Dec 2026), BIS check"}
+  t_fx_spread: {value: 0.01, source: "ASSUMPTION: bank FX spread + LC/remittance charges (no published corporate rate found)"}
+  t_itc_lag_m: {value: 1.5, source: "IGST credited once the Bill of Entry appears in GSTR-2B (~1-2 months)"}
+  t_tax_rate: {value: 0.2517, source: "Corporate tax 22% + 10% surcharge + 4% cess (new regime)"}
+  t_dep_wdv: {value: 0.40, source: "Income-tax depreciation, computers incl. servers 40% WDV (unchanged in Income-tax Act 2025)"}
   # hardware extras (USD)
-  h_net_xnode_usd: {value: 35000, source: "Per-node back-end fabric: switch share + 16 optics + cables; NICs included in HGX servers ($25k-55k)", url: "research_notes/Self hosting LLM cost Pune/hardware_prices.md", date: "2026-10"}
+  h_net_xnode_usd: {value: 35000, source: "Per-node back-end fabric for multi-node replicas: switch share + 16 optics + cables; NICs in server ($25k-55k)", date: "2026-10"}
   h_net_base_usd: {value: 15000, source: "Front-end 100GbE switch ($14,631 typ) + management switch/cabling", date: "2026"}
   h_storage_usd: {value: 12000, source: "~60 TB enterprise NVMe for weights/checkpoints at $117-150/TB + chassis share", date: "2026"}
   h_host_kv_usd_per_tb: {value: 25376, source: "DDR5 RDIMM per TB (Q4-26 forecast; range $13,968-33,024)", url: "https://www.servnetuk.com/research/ddr5-server-memory-price-tracker-2026", date: "2026"}
-  h_rack_usd: {value: 5300, source: "42U rack $3,041 + 3-phase 32A PDU $2,300", date: "2026"}
-  # facility (own room in Baner)
-  f_pue: {value: 1.6, source: PLACEHOLDER}
+  h_rack_usd: {value: 5300, source: "42U rack $3,041 + 3-phase 32A PDU $2,300 (bought in India)", date: "2026"}
+  # facility (own room in Baner) - INR ex-GST
+  f_pue_air: {value: 1.7, source: "Small air-cooled room in Pune 1.5-2.0 (Indian DC average 1.5-1.6)"}
+  f_pue_liq: {value: 1.25, source: "Liquid-cooled DLC + dry cooler 1.15-1.35 (inference)"}
   f_load: {value: 0.75, source: "ASSUMPTION: average draw while serving / max node power"}
   f_idle: {value: 0.30, source: "ASSUMPTION: idle draw / max node power"}
-  f_pf: {value: 0.95, source: "ASSUMPTION: power factor with modern PSUs + APFC"}
-  f_lt_limit_kva: {value: 150, source: PLACEHOLDER}
+  f_pf: {value: 0.98, source: "kVAh billing; modern PSUs + APFC"}
+  f_lt_limit_kva: {value: 187, source: "MERC Standards of Performance: LT supply up to 150 kW / 187 kVA in Municipal Corporation areas"}
   f_bldg_kva: {value: 0, source: "ASSUMPTION: dedicated connection for the server room"}
-  f_ht_fixed_inr: {value: 2500000, source: PLACEHOLDER}
-  f_xfmr_inr_kva: {value: 1500, source: PLACEHOLDER}
-  f_elec_inr_kw: {value: 15000, source: PLACEHOLDER}
-  f_ups_inr_kva: {value: 12000, source: PLACEHOLDER}
-  f_batt_inr_kwh: {value: 25000, source: PLACEHOLDER}
+  f_ht_fixed_inr: {value: 1740000, source: "MSEDCL HT service connection Rs2.53 L + metering cubicle Rs0.85 L + application (SoC 2020) + RMU ~Rs6 L (ASSUMPTION) + HT cabling, CEIG, liaison, substation civil ~Rs8 L (ASSUMPTION)"}
+  f_xfmr_inr_kva: {value: 1400, source: "500 kVA 11/0.433 kV transformer Rs4.5-10 L (typ Rs7 L)"}
+  f_elec_inr_kw: {value: 10000, source: "ASSUMPTION: LT panels, busduct, cabling, earthing per kW IT"}
+  f_ups_inr_kva: {value: 15000, source: "Modular online UPS Rs9,300-19,000 per kVA (IndiaMART listings)"}
+  f_batt_inr_kwh: {value: 27000, source: "Li-ion (LFP) Rs20,000-35,000 per kWh"}
   f_batt_min: {value: 10, source: "ASSUMPTION: UPS bridges until DG takes load"}
-  f_batt_life_y: {value: 8, source: PLACEHOLDER}
-  f_dg_inr_kva: {value: 12000, source: PLACEHOLDER}
-  f_air_inr_kw: {value: 40000, source: PLACEHOLDER}
-  f_liq_inr_kw: {value: 90000, source: PLACEHOLDER}
-  f_fire_inr: {value: 1500000, source: PLACEHOLDER}
-  f_sqft_per_rack: {value: 60, source: "ASSUMPTION: incl. aisles, UPS, PAC units"}
-  f_civil_inr_sqft: {value: 3500, source: PLACEHOLDER}
-  f_rent_inr_sqft: {value: 110, source: PLACEHOLDER}
+  f_batt_life_y: {value: 9, source: "Li-ion life 8-10+ years"}
+  f_dg_inr_kva: {value: 9800, source: "500 kVA CPCB IV+ DG Rs39-47 L (Rs7,800-9,400/kVA) + ~15% installation"}
+  f_air_inr_kw: {value: 60000, source: "Air cooling installed (PAC/in-row, N+1) Rs45,000-90,000 per kW IT"}
+  f_liq_inr_kw: {value: 250000, source: "Liquid cooling (RDHx Rs1.6-2.8 L/kW; direct-to-chip Rs2.2-4.4 L/kW; global benchmarks, very uncertain for India)"}
+  f_fire_inr: {value: 500000, source: "Clean-agent suppression (small room) Rs1-4.5 L + VESDA Rs1.15-1.75 L + access control/CCTV (ASSUMPTION Rs1.5 L)"}
+  f_sqft_per_rack: {value: 100, source: "ASSUMPTION: room area per rack incl. aisles, UPS/battery, PAC, DB panels"}
+  f_civil_inr_sqft: {value: 2820, source: "Server-room fit-out excl. M&E Rs1,500-3,500/sq ft (typ 2,500) + IT raised floor Rs320/sq ft"}
+  f_struct_inr_rack: {value: 150000, source: "ASSUMPTION: structural audit + steel load-spreading plinth (office slabs 2.5-3.5 kN/m2 vs 14-20 kN/m2 under a rack)"}
+  f_rent_inr_sqft: {value: 102, source: "Baner/Balewadi office lease Rs35-125 (Pune avg Rs82-90) + ~Rs12 maintenance"}
   f_contingency: {value: 0.10, source: "ASSUMPTION"}
-  f_energy_inr: {value: 12.0, source: PLACEHOLDER}
-  f_duty: {value: 0.21, source: PLACEHOLDER}
-  f_demand_inr_kva: {value: 600, source: PLACEHOLDER}
-  f_outage_h: {value: 4, source: PLACEHOLDER}
-  f_diesel_inr_l: {value: 92, source: PLACEHOLDER}
-  f_dg_l_kwh: {value: 0.27, source: "Typical DG consumption at 75% load"}
-  f_fac_amc: {value: 0.06, source: PLACEHOLDER}
-  f_staff_fte_24: {value: 5, source: "ASSUMPTION: 24x7 cover needs ~4.5-5 FTE per round-the-clock seat"}
-  f_staff_fte_bh: {value: 2, source: "ASSUMPTION: 1 MLOps + 1 facility/sysadmin in business hours"}
-  f_staff_inr: {value: 150000, source: PLACEHOLDER}
-  f_bw_inr: {value: 60000, source: PLACEHOLDER}
-  f_insure: {value: 0.004, source: PLACEHOLDER}
+  f_energy_ind: {value: 9.94, source: "MSEDCL HT-I(A) FY27 Rs8.44 + 0.81 wheeling per kVAh, + FAC ~Rs0.30, / pf 0.98, + tax on sale Rs0.19 (MERC Case 75/2025, 25 Mar 2026)", url: "https://www.mahadiscom.in/wp-content/uploads/2026/07/Tariff-Order_Case-No.-75-of-2025-dated-25th-March-2026.pdf"}
+  f_energy_com: {value: 15.32, source: "MSEDCL HT-II commercial FY27 Rs13.72 + 0.81 per kVAh, + FAC ~Rs0.30, / pf 0.98, + tax on sale Rs0.19", url: "https://www.mahadiscom.in/wp-content/uploads/2026/07/Tariff-Order_Case-No.-75-of-2025-dated-25th-March-2026.pdf"}
+  f_duty_ind: {value: 0.0, source: "Electricity duty exempt for registered IT/ITeS units (10 yrs) and data centres (20 yrs, 22 Jun 2026); 7.5% otherwise"}
+  f_duty_com: {value: 0.21, source: "Electricity duty 21% on commercial consumption (MSEDCL Circ. 273)"}
+  f_demand_inr_kva: {value: 650, source: "MSEDCL HT demand charge FY27 Rs650/kVA/month (industrial and commercial)"}
+  f_outage_h: {value: 15, source: "ASSUMPTION: Baner residents report 0-3 h/day in summer; ~0.5 h/day annual average"}
+  f_diesel_inr_l: {value: 98.6, source: "Diesel, Pune, 7 Sep 2026"}
+  f_dg_l_kwh: {value: 0.256, source: "DG fuel at 75% load 0.24-0.28 L/kWh"}
+  f_fac_amc: {value: 0.04, source: "ASSUMPTION: UPS/DG/PAC AMC ~3-5% of equipment value per year"}
+  f_staff_inr_24: {value: 550000, source: "1 MLOps (Rs28 LPA) + 1 sysadmin (Rs9 LPA) + 4 shift operators (Rs4.5 LPA) x 1.2 loading; 24x7 needs ~5 FTE per seat"}
+  f_staff_inr_bh: {value: 370000, source: "1 MLOps (Rs28 LPA) + 1 sysadmin (Rs9 LPA) x 1.2 loading; facility AMC vendor on call"}
+  f_bw_inr: {value: 30000, source: "Internet leased line 100 Mbps Rs25-38k/month (users mostly on office LAN)"}
+  f_insure: {value: 0.0075, source: "Electronic Equipment Insurance 0.3-1.25% of sum insured (old tariff 1.0-1.25%)"}
   f_hw_amc: {value: 0.10, source: "AMC years 4-5: 8-10% of hardware value per year (range 5-12%)", url: "https://introl.com/blog/gpu-infrastructure-tco-model-5-year-enterprise-ai-deployment", date: "2026"}
   f_warranty_y: {value: 3, source: "Standard 3-year OEM warranty included in server price", date: "2026"}
   # colocation
-  o_inr_kw: {value: 9000, source: PLACEHOLDER}
-  o_power_incl: {value: 0, source: PLACEHOLDER}
-  o_pue: {value: 1.5, source: PLACEHOLDER}
-  o_energy_inr: {value: 10.0, source: PLACEHOLDER}
-  o_fixed_inr: {value: 75000, source: PLACEHOLDER}
-  o_staff_fte_24: {value: 2.5, source: "ASSUMPTION: MLOps on-call rota; DC operator handles facility"}
-  o_staff_fte_bh: {value: 1.5, source: ASSUMPTION}
+  o_inr_kw: {value: 7688, source: "Pune colo MRR, deals < 250 kW, ex-power (JM Financial, Mar 2025; range Rs6,188-8,475)", url: "https://jmflresearch.com/JMnew/JMCRM/analystreports/pdf/Data-Centre-101_27Mar25.pdf"}
+  o_liq_mult: {value: 1.55, source: "Liquid-cooled racks only in Navi Mumbai (Sify/Yotta/RackBank): Mumbai MRR Rs9,750 + liquid surcharge ~Rs1.3 L/rack-month (US benchmark) ~= 1.55x Pune"}
+  o_power_incl: {value: 0, source: "Power passed through at tariff x PUE"}
+  o_pue: {value: 1.5, source: "Colo billing PUE 1.4-1.65 (JM model 1.5)"}
+  o_energy_inr: {value: 10.0, source: "Colo power pass-through ~Rs10/kWh (JM model; Yotta Rs7.57 in 2020)"}
+  o_fixed_inr: {value: 135000, source: "1 Gbps ILL ~Rs1.2 L/month + cross-connects/remote hands ~Rs15k"}
+  o_staff_inr_24: {value: 425000, source: "1 MLOps + 1 sysadmin x 1.2 loading + 15% on-call; DC operator handles facility"}
+  o_staff_inr_bh: {value: 325000, source: "1 MLOps + 0.5 sysadmin x 1.2 loading"}
   # finance
   k_rate: {value: 0.11, source: "ASSUMPTION: Indian corporate cost of capital ~10-12%"}
   k_resale: {value: 0.20, source: "H100 holds 40-75% at 36 months; H200 executed sales ~70% of list; 20% is a conservative end-of-horizon value", url: "https://www.servnetuk.com/research/gpu-residual-value-study-2026", date: "2026-Q3"}

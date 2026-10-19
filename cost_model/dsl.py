@@ -15,6 +15,7 @@ FUNCS = {
     "max": ("max", "MAX", "Math.max"),
     "min": ("min", "MIN", "Math.min"),
     "sqrt": ("math.sqrt", "SQRT", "Math.sqrt"),
+    "ln": ("math.log", "LN", "Math.log"),
     "ceil": ("_ceil", "ROUNDUP({0},0)", "_ceil"),
     "floor": ("_floor", "ROUNDDOWN({0},0)", "_floor"),
     "iff": (None, "IF", None),  # handled specially (lazy)

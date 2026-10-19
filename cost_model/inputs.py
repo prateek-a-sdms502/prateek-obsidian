@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from formulas import INPUTS, OCR_INPUTS
+from catalog import INPUTS, OCR_INPUTS
 
 DATA = Path(__file__).parent / "data"
 

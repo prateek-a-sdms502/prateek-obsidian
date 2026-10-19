@@ -1,13 +1,116 @@
-# Serving-efficiency coefficients. Defaults are PLACEHOLDERS until calibrated against
-# research_notes/.../inference_performance.md and the paid benchmark.
+# Serving-efficiency coefficients. Overrides are written by calibrate.py --write.
 default:
-  e_mem_util: {value: 0.90, source: "vLLM/SGLang default gpu_memory_utilization / mem_fraction_static"}
-  e_overhead_gb: {value: 10, source: PLACEHOLDER}
-  e_bw_eff: {value: 0.65, source: PLACEHOLDER}
-  e_flop_eff: {value: 0.35, source: PLACEHOLDER}
-  e_pf_eff: {value: 0.45, source: PLACEHOLDER}
-  e_xnode_lat_us: {value: 120, source: PLACEHOLDER}
-  e_frag: {value: 1.10, source: "ASSUMPTION: paged-KV imbalance across DP ranks/replicas"}
-  e_max_batch: {value: 256, source: "Typical max running sequences per replica"}
-  e_min_batch: {value: 8, source: "ASSUMPTION: a replica must hold at least 8 sequences at mean context"}
-overrides: {}
+  e_mem_util:
+    value: 0.9
+    source: vLLM gpu_memory_utilization / SGLang mem_fraction_static default
+  e_overhead_gb:
+    value: 10
+    source: 'ASSUMPTION: CUDA graphs, activations, DeepEP/NCCL buffers, prefill workspace per GPU'
+  e_bw_eff:
+    value: 0.7
+    source: ASSUMPTION before calibration
+  e_flop_eff:
+    value: 0.35
+    source: 'ASSUMPTION: decode MFU on grouped-GEMM MoE'
+  e_pf_eff:
+    value: 0.45
+    source: 'ASSUMPTION: prefill MFU'
+  e_xnode_lat_us:
+    value: 120
+    source: 'ASSUMPTION: cross-node all-to-all latency over 400G IB/RoCE'
+  e_frag:
+    value: 1.1
+    source: 'ASSUMPTION: paged-KV imbalance across DP ranks/replicas'
+  e_max_batch:
+    value: 256
+    source: Typical max running sequences per replica
+  e_min_batch:
+    value: 8
+    source: 'ASSUMPTION: a replica must hold at least 8 sequences at mean context'
+  e_dp_attn:
+    value: 1
+    source: SGLang/vLLM DP-attention + expert parallelism (GLM-5.3 cookbook, DSv4 vLLM recipe DP8+EP)
+  e_seq_us:
+    value: 300
+    source: Replaced by calibration
+overrides:
+  h200:
+    e_bw_eff:
+      value: 0.5
+      source: GPU-family bandwidth efficiency (calibration.yaml)
+  b200:
+    e_bw_eff:
+      value: 0.45
+      source: GPU-family bandwidth efficiency (calibration.yaml)
+  b300:
+    e_bw_eff:
+      value: 0.45
+      source: GPU-family bandwidth efficiency (calibration.yaml)
+  gb300nvl72:
+    e_bw_eff:
+      value: 0.45
+      source: GPU-family bandwidth efficiency (calibration.yaml)
+  mi355x:
+    e_bw_eff:
+      value: 0.6
+      source: GPU-family bandwidth efficiency (calibration.yaml)
+  glm53/b200:
+    e_seq_us:
+      value: 343.0
+      source: Least-squares fit to 4 published points (calibrate.py); residuals -1%, -2%, -2%, +1%
+  glm53/mi355x:
+    e_seq_us:
+      value: 291.3
+      source: Least-squares fit to 2 published points (calibrate.py); residuals -1%, +0%
+  glm53/h200:
+    e_seq_us:
+      value: 260.2
+      source: Least-squares fit to 2 published points (calibrate.py); residuals +17%, -6%
+  kimi27/h200:
+    e_seq_us:
+      value: 21.0
+      source: Least-squares fit to 2 published points (calibrate.py); residuals -3%, +1%
+  kimi27/b200:
+    e_seq_us:
+      value: 67.7
+      source: Least-squares fit to 1 published points (calibrate.py); residuals +0%
+  dsv4pro/b200:
+    e_seq_us:
+      value: 543.5
+      source: Least-squares fit to 1 published points (calibrate.py); residuals +0%
+  glm53/b300:
+    e_seq_us:
+      value: 343.0
+      source: 'No published data: inherited from glm53/b200'
+  glm53/gb300nvl72:
+    e_seq_us:
+      value: 343.0
+      source: 'No published data: inherited from glm53/b200'
+  kimi27/b300:
+    e_seq_us:
+      value: 67.7
+      source: 'No published data: inherited from kimi27/b200'
+  kimi27/gb300nvl72:
+    e_seq_us:
+      value: 67.7
+      source: 'No published data: inherited from kimi27/b200'
+  kimi27/mi355x:
+    e_seq_us:
+      value: 67.7
+      source: 'No published data: inherited from kimi27/b200'
+  dsv4pro/h200:
+    e_seq_us:
+      value: 543.5
+      source: 'No published data: inherited from dsv4pro/b200'
+  dsv4pro/b300:
+    e_seq_us:
+      value: 543.5
+      source: 'No published data: inherited from dsv4pro/b200'
+  dsv4pro/gb300nvl72:
+    e_seq_us:
+      value: 543.5
+      source: 'No published data: inherited from dsv4pro/b200'
+  dsv4pro/mi355x:
+    e_seq_us:
+      value: 543.5
+      source: 'No published data: inherited from dsv4pro/b200'

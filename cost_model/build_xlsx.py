@@ -17,7 +17,7 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from dsl import names_in, to_xl, toposort
-from formulas import INPUTS, LLM, OCR, OCR_INPUTS
+from catalog import INPUTS, LLM, OCR, OCR_INPUTS
 from inputs import ROW_KEYS, Data, meta, val
 
 FONT = "Arial"

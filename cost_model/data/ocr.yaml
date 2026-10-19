@@ -1,33 +1,41 @@
-# Chandra OCR 2 (4B). PLACEHOLDER throughput until inference_performance.md lands.
+# Chandra OCR 2 (4.66B, Qwen3.5-4B base; 10.6 GB BF16). Sized by pages/hour.
+# Throughput anchor: 1.44 pages/s on one H100 80GB, vLLM, 96 concurrent, Datalab's hard olmOCR mix
+# (Datalab estimates ~2 pages/s on real-world documents). Decode is KV/HBM-bandwidth bound, so other
+# GPUs are scaled by memory bandwidth (H100 SXM 3.35 TB/s). FP8 weights+KV ~1.6x; FP32 ~0.4x (2x bytes).
+# LICENSE: weights are modified OpenRAIL-M - no commercial use by entities with >$2M revenue/funding
+# without a paid Datalab license (cost not included here).
 tiers: {light: 1000, medium: 10000, heavy: 50000}
 gpus:
   l40s:
+    label: NVIDIA L40S 48 GB (4-GPU server)
     q_gpus_per_srv: 4
-    q_srv_usd: 60000
-    q_srv_kw: 2.5
-    q_rate_usd: 0.9
-    q_rate_in_inr: 90
+    q_srv_usd: {value: 60000, source: "4x L40S ($9k typ) + host; 8x L40S server GBP79,850", date: "2026"}
+    q_srv_kw: {value: 2.2, source: "4 x 350 W + host (inferred)"}
+    q_rate_usd: {value: 3.77, source: "AWS g6e.48xlarge N. Virginia on-demand $30.13/8", date: "2026-10-15"}
+    q_rate_in_inr: {value: 102, source: "E2E Networks L40S on-demand", url: "https://www.e2enetworks.com/pricing.md", date: "2026-10-16"}
     precisions:
-      bf16: {q_pages_s_gpu: 1.0, q_deployable: 1}
-      fp8: {q_pages_s_gpu: 1.5, q_deployable: 1}
-      fp32: {q_pages_s_gpu: 0.15, q_deployable: 1}
+      bf16: {q_pages_s_gpu: {value: 0.37, source: "1.44 x 864/3350 GB/s bandwidth scaling"}, q_deployable: 1}
+      fp8: {q_pages_s_gpu: {value: 0.59, source: "BF16 x 1.6 (ASSUMPTION: FP8 weights + KV)"}, q_deployable: 1}
+      fp32: {q_pages_s_gpu: {value: 0.15, source: "BF16 x 0.4 (ASSUMPTION; verify Gated-DeltaNet kernels support FP32)"}, q_deployable: 1}
   rtxpro6000:
-    q_gpus_per_srv: 4
-    q_srv_usd: 127673
-    q_srv_kw: 3.8
-    q_rate_usd: 1.5
-    q_rate_in_inr: 150
+    label: NVIDIA RTX PRO 6000 Blackwell 96 GB (2-GPU server)
+    q_gpus_per_srv: 2
+    q_srv_usd: {value: 66680, source: "Supermicro SYS-212GB-FNR-01-G2 2U, 2x RTX PRO 6000", url: "https://store.supermicro.com/us_en/systems/gpu.html", date: "2026-10-19"}
+    q_srv_kw: {value: 1.8, source: "2 x 600 W + host (inferred)"}
+    q_rate_usd: {value: 2.19, source: "Jarvislabs RTX PRO 6000 (India-hosted)", url: "https://jarvislabs.ai/pricing", date: "2026-10-19"}
+    q_rate_in_inr: {value: 236.55, source: "E2E Networks RTX PRO 6000 on-demand", url: "https://www.e2enetworks.com/pricing.md", date: "2026-10-16"}
     precisions:
-      bf16: {q_pages_s_gpu: 1.8, q_deployable: 1}
-      fp8: {q_pages_s_gpu: 2.6, q_deployable: 1}
-      fp32: {q_pages_s_gpu: 0.25, q_deployable: 1}
+      bf16: {q_pages_s_gpu: {value: 0.77, source: "1.44 x 1792/3350 GB/s bandwidth scaling"}, q_deployable: 1}
+      fp8: {q_pages_s_gpu: {value: 1.23, source: "BF16 x 1.6 (ASSUMPTION)"}, q_deployable: 1}
+      fp32: {q_pages_s_gpu: {value: 0.31, source: "BF16 x 0.4 (ASSUMPTION)"}, q_deployable: 1}
   h100:
-    q_gpus_per_srv: 8
-    q_srv_usd: 280000
-    q_srv_kw: 10.2
-    q_rate_usd: 2.2
-    q_rate_in_inr: 200
+    label: NVIDIA H100 (4x H100 NVL server)
+    q_gpus_per_srv: 4
+    q_srv_usd: {value: 155000, source: "4x H100 NVL ($29-35k each) + host (inferred)", date: "2026"}
+    q_srv_kw: {value: 2.4, source: "4 x 400 W + host (inferred)"}
+    q_rate_usd: {value: 3.99, source: "Lambda / Together H100 on-demand", url: "https://lambda.ai/pricing", date: "2026-10-19"}
+    q_rate_in_inr: {value: 213, source: "Ola Krutrim H100 on-demand", date: "2026-10-19"}
     precisions:
-      bf16: {q_pages_s_gpu: 2.5, q_deployable: 1}
-      fp8: {q_pages_s_gpu: 3.5, q_deployable: 1}
-      fp32: {q_pages_s_gpu: 0.4, q_deployable: 1}
+      bf16: {q_pages_s_gpu: {value: 1.44, source: "Chandra OCR 2 HF card: 1.44 pages/s on H100, vLLM, olmOCR mix", url: "https://huggingface.co/datalab-to/chandra-ocr-2"}, q_deployable: 1}
+      fp8: {q_pages_s_gpu: {value: 2.30, source: "BF16 x 1.6 (ASSUMPTION)"}, q_deployable: 1}
+      fp32: {q_pages_s_gpu: {value: 0.58, source: "BF16 x 0.4 (ASSUMPTION)"}, q_deployable: 1}
