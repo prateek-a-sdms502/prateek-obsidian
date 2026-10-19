@@ -1,0 +1,21 @@
+# Grid axes for the Matrix sheet / engine, lever combinations, and reference scenarios.
+grid:
+  models: [glm53, dsv4pro, kimi27]
+  gpus: [h200, b200, b300, mi355x, gb300nvl72]
+  workloads: [chat, mixed, agent_128k, agent_1m, stress_1m]
+  users: [50, 70, 90]
+  speeds: [20, 30, 50]
+levers:
+  uptime: [24x7, bh]
+  itc: [1, 0]
+  spare: [0, 1]
+  years: [3, 5]
+calculator_default: {model: glm53, precision: fp8, gpu: b200, workload: agent_128k, users: 90, speed: 30}
+# Six fixed scenarios checked three ways (engine, Excel, JS) by parity.py
+reference:
+  r1: {model: glm53, precision: fp8, gpu: b200, workload: agent_128k, users: 90, speed: 30, uptime: 24x7, itc: 1, spare: 0, years: 3}
+  r2: {model: dsv4pro, precision: native, gpu: b300, workload: agent_1m, users: 70, speed: 20, uptime: bh, itc: 0, spare: 1, years: 5}
+  r3: {model: kimi27, precision: native, gpu: h200, workload: chat, users: 50, speed: 50, uptime: 24x7, itc: 1, spare: 1, years: 3}
+  r4: {model: glm53, precision: bf16, gpu: mi355x, workload: mixed, users: 90, speed: 20, uptime: 24x7, itc: 0, spare: 0, years: 5}
+  r5: {model: dsv4pro, precision: fp32, gpu: gb300nvl72, workload: stress_1m, users: 90, speed: 30, uptime: 24x7, itc: 1, spare: 0, years: 3}
+  r6: {model: kimi27, precision: bf16, gpu: b200, workload: agent_1m, users: 90, speed: 30, uptime: bh, itc: 1, spare: 0, years: 3}

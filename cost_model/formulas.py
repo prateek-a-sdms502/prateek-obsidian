@@ -1,0 +1,400 @@
+"""The cost model, written once as DSL formulas (see dsl.py).
+
+Each Formula is: name, expression, unit, description. Inputs are the names in
+INPUTS (resolved per scenario by inputs.py from the YAML data files).
+
+Units: bytes in GB (1e9), bandwidth TB/s (1e12 B/s), compute TFLOPS (1e12),
+params in billions, money in INR unless the name ends in _usd, time in seconds
+unless the name says otherwise. Booleans are 0/1.
+"""
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Formula:
+    name: str
+    expr: str
+    unit: str = ""
+    desc: str = ""
+    group: str = ""
+
+
+def F(group):
+    def make(name, expr, unit="", desc=""):
+        return Formula(name, expr, unit, desc, group)
+    return make
+
+
+# ---------------------------------------------------------------------------
+# Inputs: name -> (unit, description). Resolved per scenario row.
+# ---------------------------------------------------------------------------
+INPUTS = {
+    # scenario
+    "s_users": ("users", "Peak concurrent users (signed-in, in a session)"),
+    "s_speed": ("tok/s", "Target output speed per user while generating"),
+    "s_bh_hours": ("h/month", "Operating hours per month in business-hours mode (~10 h x 22 days)"),
+    "s_usage_hours": ("h/month", "Hours per month users are actually present"),
+    "s_itc": ("0/1", "1 = company claims GST input tax credit"),
+    "s_spare": ("0/1", "1 = add one spare replica (N+1)"),
+    "s_years": ("years", "TCO horizon"),
+    "s_fx": ("INR/USD", "Exchange rate"),
+    "s_bh": ("0/1", "1 = business-hours operation (cloud on-demand stopped outside hours)"),
+    # model x precision
+    "m_weights_gb": ("GB", "Checkpoint bytes at this precision (weights resident in HBM)"),
+    "m_repl_gb": ("GB", "Non-routed-expert weights (attention, dense, shared experts, embeddings) at this precision; replicated on every GPU under DP-attention"),
+    "m_active_b": ("B params", "Active parameters per token"),
+    "m_layers": ("layers", "Transformer layers"),
+    "m_kv_tok_b": ("bytes", "KV cache stored per context token per sequence (all layers, incl. sparse-index keys)"),
+    "m_kv_read_tok_b": ("bytes", "KV bytes read per context token per decode step (= stored for dense MLA; indexer keys only for sparse)"),
+    "m_kv_read_fixed_b": ("bytes", "KV bytes read per decode step independent of context (sparse top-k entries x latent, all layers)"),
+    "m_attn_flop_ctx": ("FLOP", "Attention FLOPs per new token per attended context token (all layers)"),
+    "m_attend_cap": ("tokens", "Max context tokens each query attends to (sparse top-k; huge = dense)"),
+    "m_idx_flop_ctx": ("FLOP", "Sparse-indexer FLOPs per new token per context token (0 if dense)"),
+    "m_native_ctx": ("tokens", "Native max context"),
+    "m_mtp_draft": ("tokens", "Speculative (MTP) draft tokens per step (0 = off)"),
+    "m_mtp_accept": ("tokens", "Mean tokens emitted per decode step incl. accepted drafts (1 = no MTP)"),
+    "m_deployable": ("0/1", "0 = not servable on current engines (e.g. FP32)"),
+    "m_ops_per_layer": ("ops", "Collective/sync operations per layer per step"),
+    # gpu x precision
+    "g_hbm_gb": ("GB", "HBM per GPU"),
+    "g_bw_tbs": ("TB/s", "HBM bandwidth per GPU"),
+    "g_tflops": ("TFLOPS", "Dense tensor TFLOPS per GPU at this precision's compute format"),
+    "g_per_node": ("GPUs", "GPUs per node (8 for HGX/MI355X, 72 for NVL72)"),
+    "g_node_kw": ("kW", "Max power per node"),
+    "g_lat_us": ("us", "Per-collective latency inside a node (NVLink/xGMI)"),
+    "g_node_usd": ("USD", "Purchase price per node, incl. 3-yr warranty"),
+    "g_rate_od_usd": ("USD/GPU-h", "Cloud on-demand rate (cheapest credible provider)"),
+    "g_rate_res1_usd": ("USD/GPU-h", "Cloud 1-year reserved rate"),
+    "g_rate_res3_usd": ("USD/GPU-h", "Cloud 3-year reserved rate"),
+    "g_rate_in_inr": ("INR/GPU-h", "Cheapest Indian cloud rate (on-demand or monthly), ex-GST"),
+    "g_rack_kw": ("kW", "Rack power density this node needs (drives cooling type)"),
+    # serving efficiency (calibrated per model x gpu)
+    "e_mem_util": ("frac", "Fraction of HBM the engine may use"),
+    "e_overhead_gb": ("GB", "Per-GPU runtime overhead: CUDA graphs, activations, comm buffers, prefill workspace"),
+    "e_bw_eff": ("frac", "Achieved fraction of peak HBM bandwidth in decode"),
+    "e_flop_eff": ("frac", "Achieved fraction of peak FLOPS in decode compute"),
+    "e_pf_eff": ("frac", "Achieved fraction of peak FLOPS in prefill"),
+    "e_xnode_lat_us": ("us", "Per-collective latency across nodes (IB/RoCE)"),
+    "e_frag": ("x", "KV fragmentation / imbalance factor across replicas"),
+    "e_max_batch": ("seqs", "Engine max running sequences per replica"),
+    "e_min_batch": ("seqs", "Sequences a replica must hold at minimum when sizing nodes/replica"),
+    # workload
+    "w_duty": ("frac", "Fraction of a present user's time spent generating (decode+prefill in flight)"),
+    "w_sawtooth": ("0/1", "1 = context follows the compaction saw-tooth between floor and trigger"),
+    "w_ctx_mean": ("tokens", "Mean context per active sequence (when not saw-tooth)"),
+    "w_ctx_sd": ("tokens", "Std-dev of context per active sequence (when not saw-tooth)"),
+    "w_stress": ("0/1", "1 = worst case: every user active at the context ceiling"),
+    "w_uncached_per_out": ("tokens", "Uncached input (prefill) tokens per output token"),
+    "w_cached_per_out": ("tokens", "Prefix-cache-hit input tokens per output token"),
+    "w_presence": ("frac", "Average present users / peak users during usage hours"),
+    "w_turn_uncached": ("tokens", "Uncached prompt tokens in a typical turn (for TTFT)"),
+    "w_out_share": ("frac", "Share of context growth that is model output"),
+    # compaction (auto-summarization)
+    "c_ceiling": ("tokens", "Advertised context ceiling (1,000,000)"),
+    "c_trigger": ("tokens", "Compaction trigger T requested"),
+    "c_floor": ("tokens", "Context right after compaction: system + summary + pinned files"),
+    "c_summary_out": ("tokens", "Tokens generated to write a summary"),
+    "c_reserve": ("tokens", "Window kept free for the summary prompt + max output"),
+    # cloud extras
+    "p_storage_tb_inr": ("INR/TB-month", "Persistent storage for weights"),
+    "p_cloud_gst": ("frac", "GST on cloud services"),
+    "p_warmup_h": ("h/day", "Daily cold-start hours billed for business-hours rental (weights load)"),
+    "p_days": ("days/month", "Working days per month"),
+    "p_rent_decline": ("frac/yr", "Year-on-year decline in GPU rental rates"),
+    # tax / import
+    "t_freight": ("frac", "Freight + insurance as fraction of FOB (gives CIF)"),
+    "t_landing": ("frac", "Customs landing charge on CIF"),
+    "t_bcd_srv": ("frac", "BCD on servers/GPU boards"),
+    "t_bcd_net": ("frac", "BCD on network switches/optics"),
+    "t_sws": ("frac", "Social Welfare Surcharge as fraction of BCD"),
+    "t_igst": ("frac", "IGST/GST on hardware"),
+    "t_clear_inr": ("INR", "Customs broker, port, IMS/BIS and clearance per shipment"),
+    "t_fx_spread": ("frac", "Bank FX spread + LC/remittance charges"),
+    "t_itc_lag_m": ("months", "Months IGST cash is tied up before ITC is used"),
+    "t_tax_rate": ("frac", "Corporate tax rate (for post-tax PV)"),
+    "t_dep_wdv": ("frac", "Income-tax WDV depreciation rate on servers"),
+    # hardware extras (USD)
+    "h_net_xnode_usd": ("USD/node", "Scale-out fabric per node (NICs, leaf share, optics) when a replica spans nodes"),
+    "h_net_base_usd": ("USD", "Front-end switching + management network per deployment"),
+    "h_storage_usd": ("USD", "Shared NVMe storage for weights + logs per deployment"),
+    "h_host_kv_usd_per_tb": ("USD/TB", "Host RAM/NVMe tier for idle-session KV"),
+    "h_rack_usd": ("USD/rack", "Rack + PDUs + cabling"),
+    # facility, own room in Baner (INR)
+    "f_pue": ("x", "Power usage effectiveness"),
+    "f_load": ("frac", "Average draw / max node power while serving"),
+    "f_idle": ("frac", "Draw / max power when idle (outside business hours, on-prem)"),
+    "f_pf": ("x", "Power factor (kW -> kVA)"),
+    "f_lt_limit_kva": ("kVA", "Max contract demand on an LT connection"),
+    "f_bldg_kva": ("kVA", "Existing building/office load already on the connection"),
+    "f_ht_fixed_inr": ("INR", "HT connection fixed costs: RMU, HT metering, CEIG, MSEDCL charges, deposit, civil for substation"),
+    "f_xfmr_inr_kva": ("INR/kVA", "Transformer cost per kVA"),
+    "f_elec_inr_kw": ("INR/kW", "LT panels, busbar, cabling, earthing per kW of IT"),
+    "f_ups_inr_kva": ("INR/kVA", "Online modular UPS per kVA"),
+    "f_batt_inr_kwh": ("INR/kWh", "UPS battery per kWh"),
+    "f_batt_min": ("min", "UPS runtime minutes (until DG takes load)"),
+    "f_batt_life_y": ("years", "Battery replacement cycle"),
+    "f_dg_inr_kva": ("INR/kVA", "CPCB-IV+ DG set per kVA incl. install"),
+    "f_air_inr_kw": ("INR/kW", "Precision air cooling per kW (racks <= 30 kW)"),
+    "f_liq_inr_kw": ("INR/kW", "Rear-door / direct-liquid cooling per kW (racks > 30 kW)"),
+    "f_fire_inr": ("INR", "Clean-agent suppression + VESDA + access control + CCTV"),
+    "f_sqft_per_rack": ("sq ft", "Room area per rack incl. aisles, UPS, cooling"),
+    "f_civil_inr_sqft": ("INR/sq ft", "Civil/fit-out per sq ft (raised floor, insulation, reinforcement)"),
+    "f_rent_inr_sqft": ("INR/sq ft-month", "Office lease in Baner"),
+    "f_contingency": ("frac", "Contingency on facility capex"),
+    "f_energy_inr": ("INR/kWh", "Energy charge + FAC + wheeling (effective)"),
+    "f_duty": ("frac", "Electricity duty + tax on sale (fraction of energy bill)"),
+    "f_demand_inr_kva": ("INR/kVA-month", "Demand / fixed charge"),
+    "f_outage_h": ("h/month", "Grid outage hours on DG"),
+    "f_diesel_inr_l": ("INR/L", "Diesel price"),
+    "f_dg_l_kwh": ("L/kWh", "DG fuel consumption"),
+    "f_fac_amc": ("frac/yr", "Facility equipment AMC (UPS, DG, cooling) as fraction of its capex"),
+    "f_staff_fte_24": ("FTE", "Staff for an own room run 24x7 (~4.5-5 FTE per round-the-clock seat)"),
+    "f_staff_fte_bh": ("FTE", "Staff for an own room run business hours only"),
+    "f_staff_inr": ("INR/FTE-month", "Loaded monthly cost per FTE"),
+    "f_bw_inr": ("INR/month", "Internet leased line"),
+    "f_insure": ("frac/yr", "Insurance premium on hardware + facility"),
+    "f_hw_amc": ("frac/yr", "Hardware AMC after warranty"),
+    "f_warranty_y": ("years", "Warranty years included in server price"),
+    # colocation
+    "o_inr_kw": ("INR/kW-month", "Colo price per contracted kW (space + cooling)"),
+    "o_power_incl": ("0/1", "1 = power included in per-kW price"),
+    "o_pue": ("x", "Colo PUE used for power pass-through"),
+    "o_energy_inr": ("INR/kWh", "Colo power pass-through tariff"),
+    "o_fixed_inr": ("INR/month", "Cross-connects, remote hands, bandwidth"),
+    "o_staff_fte_24": ("FTE", "Staff with colo, 24x7 (no facility techs)"),
+    "o_staff_fte_bh": ("FTE", "Staff with colo, business hours"),
+    # finance
+    "k_rate": ("frac/yr", "Cost of capital"),
+    "k_resale": ("frac", "Resale value of hardware at end of horizon (fraction of cost)"),
+}
+
+
+# ---------------------------------------------------------------------------
+# LLM sizing + cost formulas
+# ---------------------------------------------------------------------------
+_c = F("compaction")
+_m = F("memory")
+_d = F("throughput")
+_z = F("sizing")
+_r = F("rent")
+_b = F("buy")
+_o = F("colo")
+_x = F("outputs")
+
+_l = F("levers")
+LEVERS = [
+    _l("s_hours_on", "iff(s_bh == 1, s_bh_hours, 730)", "h/month", "Hours per month powered/rented"),
+    _l("f_staff_fte", "iff(s_bh == 1, f_staff_fte_bh, f_staff_fte_24)", "FTE", "Staff, own room"),
+    _l("o_staff_fte", "iff(s_bh == 1, o_staff_fte_bh, o_staff_fte_24)", "FTE", "Staff, colocation"),
+]
+
+LLM = LEVERS + [
+    # --- compaction / context ------------------------------------------------
+    _c("c_T", "min(c_trigger, m_native_ctx - c_reserve)", "tokens",
+       "Effective compaction trigger: requested T, capped so summary prompt + max output fit the native window"),
+    _c("ctx_mean", "iff(w_stress == 1, min(c_ceiling, m_native_ctx), iff(w_sawtooth == 1, (c_T + c_floor) / 2, w_ctx_mean))", "tokens",
+       "Mean context per active sequence (saw-tooth mean is (T+floor)/2)"),
+    _c("ctx_sd", "iff(w_stress == 1, 0, iff(w_sawtooth == 1, (c_T - c_floor) / sqrt(12), w_ctx_sd))", "tokens",
+       "Std-dev of context per active sequence (uniform saw-tooth: (T-floor)/sqrt(12))"),
+    _c("cmp_out_overhead", "iff(w_sawtooth == 1, c_summary_out / max(1, w_out_share * (c_T - c_floor)), 0)", "frac",
+       "Extra output tokens spent writing summaries, per normal output token"),
+    _c("cmp_pf_overhead", "iff(w_sawtooth == 1, c_floor / max(1, w_uncached_per_out * w_out_share * (c_T - c_floor)), 0)", "frac",
+       "Extra uncached prefill after each compaction (cold re-prefill of the floor), per normal uncached token"),
+    _c("uncached_per_out", "w_uncached_per_out * (1 + cmp_pf_overhead) / (1 + cmp_out_overhead)", "tokens",
+       "Uncached prefill tokens per emitted token, incl. compaction"),
+
+    # --- concurrency -----------------------------------------------------------
+    _z("active_mean", "iff(w_stress == 1, s_users, s_users * w_duty)", "seqs", "Mean sequences in flight at peak"),
+    _z("active_p99", "iff(w_stress == 1, s_users, min(s_users, active_mean + 2.33 * sqrt(s_users * w_duty * (1 - w_duty))))", "seqs",
+       "99th-percentile sequences in flight (binomial)"),
+
+    # --- memory ----------------------------------------------------------------
+    _m("usable_gb", "g_hbm_gb * e_mem_util - e_overhead_gb", "GB/GPU", "HBM usable for weights + KV per GPU"),
+    _m("fits_repl", "iff(usable_gb > m_repl_gb, 1, 0)", "0/1", "Replicated weights fit on one GPU"),
+    _m("kv_seq_gb", "ctx_mean * m_kv_tok_b / 1e9", "GB", "KV per sequence at mean context"),
+    _m("gpus_rep_min", "iff(fits_repl == 1, (m_weights_gb - m_repl_gb + e_min_batch * kv_seq_gb) / max(0.001, usable_gb - m_repl_gb), 1e9)", "GPUs",
+       "GPUs a replica needs for weights + minimum batch (DP-attention + EP)"),
+    _m("nodes_rep", "max(1, ceil(gpus_rep_min / g_per_node))", "nodes", "Nodes per replica"),
+    _m("gpus_rep", "nodes_rep * g_per_node", "GPUs", "GPUs per replica"),
+    _m("kv_cap_gb", "gpus_rep * (usable_gb - m_repl_gb) - (m_weights_gb - m_repl_gb)", "GB", "KV capacity per replica"),
+    _m("kv_need_gb", "e_frag * (active_p99 * ctx_mean + 2.33 * ctx_sd * sqrt(active_p99)) * m_kv_tok_b / 1e9", "GB",
+       "Total KV needed at the 99th percentile of summed context"),
+    _m("rep_mem", "ceil(kv_need_gb / max(0.001, kv_cap_gb))", "replicas", "Replicas needed for KV memory"),
+    _m("w_per_gpu_gb", "m_repl_gb + (m_weights_gb - m_repl_gb) / gpus_rep", "GB", "Weights resident per GPU"),
+
+    # --- decode / prefill timing (per replica) ---------------------------------
+    _d("lat_us", "iff(nodes_rep > 1, e_xnode_lat_us, g_lat_us)", "us", "Per-collective latency"),
+    _d("t_w", "w_per_gpu_gb * 1e9 / (g_bw_tbs * 1e12 * e_bw_eff)", "s", "Weight-read time per step (all experts read at batch >= ~64)"),
+    _d("t_lat", "m_layers * m_ops_per_layer * lat_us * 1e-6", "s", "Collective latency per step"),
+    _d("attended", "min(ctx_mean, m_attend_cap)", "tokens", "Context tokens each query attends to"),
+    _d("t_kv", "(ctx_mean * m_kv_read_tok_b + m_kv_read_fixed_b) * (1 + m_mtp_draft) / (gpus_rep * g_bw_tbs * 1e12 * e_bw_eff)", "s/seq",
+       "KV-read time per sequence per step (DP-attention spreads sequences over GPUs)"),
+    _d("flop_tok", "2 * m_active_b * 1e9 + m_attn_flop_ctx * attended + m_idx_flop_ctx * ctx_mean", "FLOP", "FLOPs per processed token at mean context"),
+    _d("t_c", "(1 + m_mtp_draft) * flop_tok / (gpus_rep * g_tflops * 1e12 * e_flop_eff)", "s/seq", "Decode compute per sequence per step"),
+    _d("t_pf", "m_mtp_accept * uncached_per_out * flop_tok / (gpus_rep * g_tflops * 1e12 * e_pf_eff)", "s/seq",
+       "Chunked prefill time per sequence per step (its share of new prompt tokens)"),
+    _d("t_seq", "t_kv + t_c + t_pf", "s/seq", "Per-sequence time added to each step"),
+    _d("b_dec_raw", "(m_mtp_accept / s_speed - t_w - t_lat) / t_seq", "seqs", "Max batch per replica that still meets the speed target"),
+    _d("speed_ok", "iff(b_dec_raw >= 1, 1, 0)", "0/1", "Target speed reachable on this hardware"),
+    _d("b_dec", "max(1, min(e_max_batch, floor(b_dec_raw)))", "seqs", "Decode batch per replica at target speed"),
+    _d("rep_dec", "ceil(active_p99 / b_dec)", "replicas", "Replicas needed for speed"),
+
+    # --- sizing ----------------------------------------------------------------
+    _z("rep_n", "max(rep_mem, rep_dec)", "replicas", "Replicas (N)"),
+    _z("rep_total", "rep_n + s_spare", "replicas", "Replicas incl. spare"),
+    _z("nodes", "rep_total * nodes_rep", "nodes", "Nodes"),
+    _z("gpus", "nodes * g_per_node", "GPUs", "GPUs"),
+    _z("bound", "iff(rep_mem > rep_dec, 1, 0)", "0/1", "1 = memory-bound, 0 = speed-bound"),
+    _z("b_actual", "active_p99 / rep_n", "seqs", "Sequences per replica at peak"),
+    _z("speed_actual", "m_mtp_accept / (t_w + t_lat + b_actual * t_seq)", "tok/s", "Per-user speed at peak load"),
+    _z("ttft", "w_turn_uncached * flop_tok / (gpus_rep * g_tflops * 1e12 * e_pf_eff) + t_w + t_lat", "s",
+       "Time to first token for a typical uncached turn on an idle replica"),
+    _z("feasible", "iff(m_deployable == 1, speed_ok * fits_repl, 0)", "0/1", "Configuration is deployable and meets the target"),
+    _z("host_kv_tb", "iff(w_stress == 1, 0, s_users * (1 - w_duty) * ctx_mean * m_kv_tok_b / 1e12)", "TB",
+       "Host RAM/NVMe tier for idle sessions' KV"),
+
+    # --- power -----------------------------------------------------------------
+    _z("it_kw_max", "nodes * g_node_kw", "kW", "IT load at max power"),
+    _z("it_kw_avg", "it_kw_max * f_load", "kW", "IT load while serving"),
+
+    # --- tokens served -----------------------------------------------------------
+    _x("out_tok_m", "s_users * w_presence * w_duty * speed_actual * 3600 * min(s_usage_hours, s_hours_on) / (1 + cmp_out_overhead)", "tokens/month",
+       "Useful output tokens served per month"),
+    _x("in_tok_m", "out_tok_m * (uncached_per_out + w_cached_per_out)", "tokens/month", "Input tokens processed per month"),
+
+    # --- rent ------------------------------------------------------------------
+    _r("rent_hours_bh", "s_hours_on + p_warmup_h * p_days", "h/month", "Billed hours for business-hours on-demand"),
+    _r("rent_gst", "1 + p_cloud_gst * (1 - s_itc)", "x", "GST factor on cloud (recoverable with ITC)"),
+    _r("rent_storage", "p_storage_tb_inr * rep_total * m_weights_gb / 1000 * 1.2", "INR/month", "Weights on persistent storage"),
+    _r("rent_od", "(gpus * g_rate_od_usd * s_fx * iff(s_bh == 1, rent_hours_bh, 730) + rent_storage) * rent_gst", "INR/month",
+       "Global cloud, on-demand"),
+    _r("rent_res1", "(gpus * g_rate_res1_usd * s_fx * 730 + rent_storage) * rent_gst", "INR/month", "Global cloud, 1-yr reserved (billed 24/7)"),
+    _r("rent_res3", "(gpus * g_rate_res3_usd * s_fx * 730 + rent_storage) * rent_gst", "INR/month", "Global cloud, 3-yr reserved (billed 24/7)"),
+    _r("rent_in", "(gpus * g_rate_in_inr * iff(s_bh == 1, rent_hours_bh, 730) + rent_storage) * rent_gst", "INR/month",
+       "Indian cloud (cheapest), on-demand/monthly"),
+    _r("rent_best", "iff(s_bh == 1, min(rent_od, rent_in), min(rent_od, rent_res1, rent_in))", "INR/month",
+       "Cheapest rental option for this pattern (excl. 3-yr commit)"),
+    _r("rent_decline_avg", "iff(p_rent_decline > 0, (1 - (1 - p_rent_decline) ** s_years) / (p_rent_decline * s_years), 1)", "x",
+       "Average rate over the horizon relative to today (declining prices)"),
+    _r("rent_tco", "rent_best * 12 * s_years * rent_decline_avg", "INR", "Rental cost over the horizon"),
+
+    # --- buy: landed hardware ---------------------------------------------------
+    _b("hw_srv_usd", "nodes * g_node_usd + h_host_kv_usd_per_tb * host_kv_tb + h_storage_usd", "USD", "Servers + host KV tier + storage"),
+    _b("hw_net_usd", "h_net_base_usd + iff(nodes_rep > 1, nodes * h_net_xnode_usd, 0)", "USD", "Networking"),
+    _b("racks", "ceil(it_kw_max / g_rack_kw)", "racks", "Racks"),
+    _b("hw_rack_usd", "racks * h_rack_usd", "USD", "Racks, PDUs, cabling"),
+    _b("cif_srv", "(hw_srv_usd + hw_rack_usd) * s_fx * (1 + t_freight) * (1 + t_landing)", "INR", "Assessable value, servers"),
+    _b("cif_net", "hw_net_usd * s_fx * (1 + t_freight) * (1 + t_landing)", "INR", "Assessable value, network"),
+    _b("duty_srv", "cif_srv * t_bcd_srv * (1 + t_sws)", "INR", "BCD + SWS, servers"),
+    _b("duty_net", "cif_net * t_bcd_net * (1 + t_sws)", "INR", "BCD + SWS, network"),
+    _b("igst_hw", "(cif_srv + duty_srv + cif_net + duty_net) * t_igst", "INR", "IGST on import"),
+    _b("hw_landed", "(cif_srv + duty_srv + cif_net + duty_net) * (1 + t_fx_spread) + t_clear_inr + igst_hw * (1 - s_itc) + igst_hw * s_itc * k_rate * t_itc_lag_m / 12",
+       "INR", "Landed hardware cost (IGST is a cost without ITC; with ITC only its financing cost)"),
+
+    # --- buy: own room in Baner ------------------------------------------------
+    _b("kva_it", "it_kw_max * f_pue / f_pf", "kVA", "Contract demand (facility at peak)"),
+    _b("needs_ht", "iff(kva_it + f_bldg_kva > f_lt_limit_kva, 1, 0)", "0/1", "Load exceeds LT limit -> HT connection"),
+    _b("fac_elec", "needs_ht * (f_ht_fixed_inr + f_xfmr_inr_kva * (kva_it + f_bldg_kva)) + f_elec_inr_kw * it_kw_max", "INR",
+       "Electrical: HT connection/transformer if needed + LT distribution"),
+    _b("fac_ups", "f_ups_inr_kva * it_kw_max / f_pf + f_batt_inr_kwh * it_kw_max * f_batt_min / 60", "INR", "UPS + batteries (IT load)"),
+    _b("fac_dg", "f_dg_inr_kva * kva_it", "INR", "DG set (whole facility load)"),
+    _b("fac_cool", "it_kw_max * iff(g_rack_kw > 30, f_liq_inr_kw, f_air_inr_kw)", "INR", "Cooling"),
+    _b("room_sqft", "racks * f_sqft_per_rack", "sq ft", "Room area"),
+    _b("fac_civil", "room_sqft * f_civil_inr_sqft + f_fire_inr", "INR", "Civil, fit-out, fire, security"),
+    _b("fac_equip", "(fac_ups + fac_dg + fac_cool) * (1 + f_contingency)", "INR", "Facility equipment (GST credit allowed)"),
+    _b("fac_works", "(fac_elec + fac_civil) * (1 + f_contingency)", "INR", "Facility works (GST credit blocked u/s 17(5))"),
+    _b("fac_capex", "fac_equip * (1 + t_igst * (1 - s_itc)) + fac_works * (1 + t_igst)", "INR", "Facility capex incl. GST"),
+    _b("buy_capex", "hw_landed + fac_capex", "INR", "Total capex, own room"),
+
+    _b("hours_idle", "730 - s_hours_on", "h/month", "Hours idle (on-prem stays powered)"),
+    _b("kwh_m", "it_kw_max * f_pue * (f_load * s_hours_on + f_idle * hours_idle)", "kWh/month", "Facility energy"),
+    _b("power_m", "kwh_m * f_energy_inr * (1 + f_duty) + kva_it * f_demand_inr_kva", "INR/month", "Electricity bill (incremental)"),
+    _b("diesel_m", "f_outage_h * it_kw_avg * f_pue * f_dg_l_kwh * f_diesel_inr_l", "INR/month", "DG diesel"),
+    _b("amc_years", "max(0, s_years - f_warranty_y)", "years", "Years of paid hardware AMC within the horizon"),
+    _b("hw_amc_m", "hw_landed * f_hw_amc * amc_years / s_years / 12", "INR/month", "Hardware AMC (averaged)"),
+    _b("fac_amc_m", "fac_equip * f_fac_amc / 12", "INR/month", "Facility AMC"),
+    _b("batt_m", "f_batt_inr_kwh * it_kw_max * f_batt_min / 60 / (f_batt_life_y * 12)", "INR/month", "Battery replacement reserve"),
+    _b("insure_m", "buy_capex * f_insure / 12", "INR/month", "Insurance"),
+    _b("staff_m", "f_staff_fte * f_staff_inr", "INR/month", "Staff"),
+    _b("space_m", "room_sqft * f_rent_inr_sqft", "INR/month", "Space rent"),
+    _b("buy_opex", "power_m + diesel_m + hw_amc_m + fac_amc_m + batt_m + insure_m + staff_m + space_m + f_bw_inr", "INR/month", "Opex, own room"),
+
+    # --- finance ---------------------------------------------------------------
+    _b("k_m", "k_rate / 12", "frac/month", "Monthly cost of capital"),
+    _b("k_n", "s_years * 12", "months", "Horizon months"),
+    _b("crf", "k_m / (1 - (1 + k_m) ** (-k_n))", "x", "Capital recovery factor"),
+    _b("resale_pv", "k_resale * hw_landed / (1 + k_m) ** k_n", "INR", "PV of resale"),
+    _b("buy_capex_m", "crf * (buy_capex - resale_pv)", "INR/month", "Capex as a monthly charge (incl. cost of capital)"),
+    _b("buy_m", "buy_capex_m + buy_opex", "INR/month", "All-in monthly cost, own room"),
+    _b("buy_tco", "buy_m * k_n", "INR", "Cost over horizon, own room"),
+
+    # --- colocation ------------------------------------------------------------
+    _o("colo_kw", "it_kw_max", "kW", "Contracted kW"),
+    _o("colo_power_m", "(1 - o_power_incl) * it_kw_max * o_pue * (f_load * s_hours_on + f_idle * hours_idle) * o_energy_inr", "INR/month", "Power pass-through"),
+    _o("colo_opex", "colo_kw * o_inr_kw + colo_power_m + o_fixed_inr + hw_amc_m + hw_landed * f_insure / 12 + o_staff_fte * f_staff_inr", "INR/month", "Opex, colocation"),
+    _o("colo_capex_m", "crf * (hw_landed - resale_pv)", "INR/month", "Hardware capex as monthly charge"),
+    _o("colo_m", "colo_capex_m + colo_opex", "INR/month", "All-in monthly cost, colocation"),
+    _o("colo_tco", "colo_m * k_n", "INR", "Cost over horizon, colocation"),
+
+    # --- post-tax PV (WDV depreciation shield) ----------------------------------
+    _x("k_y", "(1 + k_m) ** 12 - 1", "frac/yr", "Effective annual cost of capital"),
+    _x("dep_q", "(1 - t_dep_wdv) / (1 + k_y)", "x", "WDV discount ratio"),
+    _x("dep_shield_pv", "t_tax_rate * hw_landed * t_dep_wdv / (1 + k_y) * (1 - dep_q ** s_years) / (1 - dep_q)", "INR",
+       "PV of depreciation tax shield on hardware over the horizon"),
+    _x("annuity", "(1 - (1 + k_m) ** (-k_n)) / k_m", "x", "PV of 1 INR/month over the horizon"),
+    _x("pv_buy", "buy_capex - dep_shield_pv + buy_opex * (1 - t_tax_rate) * annuity - resale_pv * (1 - t_tax_rate)", "INR",
+       "Post-tax PV, own room"),
+    _x("pv_rent", "rent_best * rent_decline_avg * (1 - t_tax_rate) * annuity", "INR", "Post-tax PV, rent"),
+
+    # --- headline outputs -------------------------------------------------------
+    _x("best_m", "min(rent_best, buy_m, colo_m)", "INR/month", "Cheapest option per month"),
+    _x("breakeven_m", "iff(rent_best > buy_opex, buy_capex / (rent_best - buy_opex), 999)", "months",
+       "Months until buying (own room) beats renting at today's rates (999 = never)"),
+    _x("per_user_buy", "buy_m / s_users", "INR/user-month", "Own room, per peak user"),
+    _x("per_user_rent", "rent_best / s_users", "INR/user-month", "Rent, per peak user"),
+    _x("per_mtok_out_buy", "buy_m / max(1, out_tok_m / 1e6)", "INR/M output tok", "Own room, per million output tokens (all cost on output)"),
+    _x("per_mtok_out_rent", "rent_best / max(1, out_tok_m / 1e6)", "INR/M output tok", "Rent, per million output tokens"),
+    _x("usd_buy_m", "buy_m / s_fx", "USD/month", "Own room, USD"),
+    _x("usd_rent_m", "rent_best / s_fx", "USD/month", "Rent, USD"),
+    _x("usd_colo_m", "colo_m / s_fx", "USD/month", "Colo, USD"),
+]
+
+
+# ---------------------------------------------------------------------------
+# OCR (Chandra OCR 2): sized by pages/hour, not users
+# ---------------------------------------------------------------------------
+OCR_INPUTS = {
+    "q_pages_h": ("pages/h", "Peak pages per hour"),
+    "q_pages_s_gpu": ("pages/s", "Measured/estimated pages per second per GPU at this precision"),
+    "q_util": ("frac", "Target utilisation at peak"),
+    "q_gpus_per_srv": ("GPUs", "GPUs per OCR server"),
+    "q_srv_usd": ("USD", "OCR server price (with q_gpus_per_srv GPUs)"),
+    "q_srv_kw": ("kW", "OCR server max power"),
+    "q_rate_usd": ("USD/GPU-h", "Cloud rate for this GPU"),
+    "q_rate_in_inr": ("INR/GPU-h", "Indian cloud rate for this GPU"),
+    "q_deployable": ("0/1", "0 = precision not servable"),
+}
+
+_q = F("ocr")
+OCR = LEVERS + [
+    _q("q_gpus_n", "max(1, ceil(q_pages_h / 3600 / (q_pages_s_gpu * q_util)))", "GPUs", "GPUs needed (N)"),
+    _q("q_gpus", "q_gpus_n + s_spare", "GPUs", "GPUs incl. spare"),
+    _q("q_srv", "ceil(q_gpus / q_gpus_per_srv)", "servers", "Servers"),
+    _q("q_kw", "q_srv * q_srv_kw", "kW", "IT load at max power"),
+    _q("q_rent_m", "min(q_gpus * q_rate_usd * s_fx, q_gpus * q_rate_in_inr) * iff(s_bh == 1, s_hours_on + p_warmup_h * p_days, 730) * (1 + p_cloud_gst * (1 - s_itc))", "INR/month",
+       "Cheapest rental"),
+    _q("q_cif", "(q_srv * q_srv_usd + h_rack_usd) * s_fx * (1 + t_freight) * (1 + t_landing)", "INR", "Assessable value"),
+    _q("q_landed", "q_cif * (1 + t_bcd_srv * (1 + t_sws)) * (1 + t_fx_spread) + t_clear_inr + q_cif * (1 + t_bcd_srv * (1 + t_sws)) * t_igst * (1 - s_itc)", "INR",
+       "Landed hardware"),
+    _q("q_kwh_m", "q_kw * f_pue * (f_load * s_hours_on + f_idle * (730 - s_hours_on))", "kWh/month", "Energy"),
+    _q("q_k_m", "k_rate / 12", "frac/month", "Monthly cost of capital"),
+    _q("q_crf", "q_k_m / (1 - (1 + q_k_m) ** (-(s_years * 12)))", "x", "Capital recovery factor"),
+    _q("q_colo_m", "q_crf * (q_landed - k_resale * q_landed / (1 + q_k_m) ** (s_years * 12)) + q_kw * o_inr_kw + (1 - o_power_incl) * q_kwh_m / f_pue * o_pue * o_energy_inr + q_landed * (f_insure + f_hw_amc * max(0, s_years - f_warranty_y) / s_years) / 12", "INR/month",
+       "Bought, hosted in colo (no extra staff: shares the LLM team)"),
+    _q("q_room_m", "q_crf * (q_landed - k_resale * q_landed / (1 + q_k_m) ** (s_years * 12)) + q_kwh_m * f_energy_inr * (1 + f_duty) + q_kw * f_pue / f_pf * f_demand_inr_kva + q_landed * (f_insure + f_hw_amc * max(0, s_years - f_warranty_y) / s_years) / 12", "INR/month",
+       "Bought, in an existing room (incremental power + capex; no facility build)"),
+    _q("q_pages_m", "q_pages_h * min(s_usage_hours, s_hours_on) * 0.5", "pages/month", "Pages per month (average = half of peak over usage hours)"),
+    _q("q_per_1k_rent", "q_rent_m / max(1, q_pages_m / 1000)", "INR/1k pages", "Rent, per 1,000 pages"),
+    _q("q_per_1k_room", "q_room_m / max(1, q_pages_m / 1000)", "INR/1k pages", "Bought, per 1,000 pages"),
+    _q("q_feasible", "q_deployable", "0/1", "Deployable"),
+]
