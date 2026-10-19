@@ -1,49 +1,143 @@
-# PLACEHOLDER values: replaced from research_notes/.../model_specs.md once available.
+# Model architecture inputs. Source: research_notes/Self hosting LLM cost Pune/model_specs.md
+# (official HF config.json / safetensors index, vLLM & SGLang recipes, read 2026-10-19).
+# Bytes are decimal GB (1e9). KV figures are per context token, all layers.
+# Derivations are shown in the `note` fields; "upcast" precisions are not officially released.
 models:
   glm53:
-    label: GLM-5.3 (Z.ai)
-    m_active_b: {value: 40, source: PLACEHOLDER}
-    m_layers: {value: 78, source: PLACEHOLDER}
-    m_native_ctx: {value: 1048576, source: PLACEHOLDER}
-    m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
-    m_attend_cap: {value: 2048, source: PLACEHOLDER}
-    m_attn_flop_ctx: {value: 10900000, source: PLACEHOLDER}
-    m_idx_flop_ctx: {value: 1280000, source: PLACEHOLDER}
-    m_mtp_draft: {value: 1, source: PLACEHOLDER}
-    m_mtp_accept: {value: 1.7, source: PLACEHOLDER}
+    label: GLM-5.3 (Z.ai) - 753B total / ~40B active MoE, MLA + DSA sparse attention
+    m_active_b: {value: 40, source: "GLM-5 card 744B/40B active; vLLM recipe 743B/39B", url: "https://huggingface.co/zai-org/GLM-5"}
+    m_layers: {value: 78, source: "config.json num_hidden_layers (+1 MTP layer)", url: "https://huggingface.co/zai-org/GLM-5.3-BF16/raw/main/config.json"}
+    m_native_ctx: {value: 1048576, source: "config.json max_position_embeddings; vLLM recipe: native 1M window", url: "https://github.com/vllm-project/recipes/blob/main/models/zai-org/GLM-5.3.yaml"}
+    m_ops_per_layer: {value: 2, source: "Two collectives per layer at decode (attention + MoE all-reduce / dispatch-combine)"}
+    m_attend_cap: {value: 2048, source: "config.json index_topk 2048 (DSA sparse attention)"}
+    m_attn_flop_ctx: {value: 10862592, source: "Derived: 64 heads x 2 x (576 qk + 512 v) x 78 layers per attended token (absorbed MLA)"}
+    m_idx_flop_ctx: {value: 172032, source: "Derived: 21 indexer layers (IndexShare) x 32 index heads x 128 dim x 2 per context token"}
+    m_mtp_accept: {value: 1.95, source: "Fitted: SGLang GLM-5 FP8 B200 EAGLE 3/1/4 vs off at conc 64/128 (InferenceX, May 2026); single-user acceptance ~3.5", url: "https://inferencex.semianalysis.com/blog/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar"}
+    m_kv_seq_fixed_b: 0
     precisions:
-      bf16: {compute_fmt: bf16, m_weights_gb: 1508, m_repl_gb: 60, m_kv_tok_b: 109824, m_kv_read_tok_b: 20000, m_kv_read_fixed_b: 184000000, m_deployable: 1}
-      fp8: {compute_fmt: fp8, m_weights_gb: 760, m_repl_gb: 31, m_kv_tok_b: 61464, m_kv_read_tok_b: 10296, m_kv_read_fixed_b: 105000000, m_deployable: 1}
-      fp32: {compute_fmt: fp32, m_weights_gb: 3016, m_repl_gb: 120, m_kv_tok_b: 219648, m_kv_read_tok_b: 40000, m_kv_read_fixed_b: 368000000, m_deployable: 0}
+      fp8:
+        label: FP8 (official default checkpoint = native)
+        compute_fmt: fp8
+        m_weights_gb: {value: 755.6, source: "zai-org/GLM-5.3 safetensors index total_size 755,617,140,416 B", url: "https://huggingface.co/zai-org/GLM-5.3/blob/main/model.safetensors.index.json"}
+        m_repl_gb: {value: 21.0, source: "Derived: 18.89B non-routed params (16.8B FP8 + 2.1B BF16)"}
+        m_kv_tok_b: {value: 54728, source: "Derived: 78x656 (FP8 MLA) + 21x132 (indexer) + MTP layer 788; matches vLLM ~450K tokens in 23 GiB on 8xH200"}
+        m_kv_read_tok_b: {value: 2904, source: "Derived: 22 indexer caches x 132 B scanned per context token per step"}
+        m_kv_read_fixed_b: {value: 106100000, source: "Derived: top-2048 entries x 79 layers x 656 B per step"}
+        m_deployable: 1
+      bf16:
+        label: BF16 (official zai-org/GLM-5.3-BF16)
+        compute_fmt: bf16
+        m_weights_gb: {value: 1506.7, source: "zai-org/GLM-5.3-BF16 index total_size 1,506,659,919,872 B", url: "https://huggingface.co/zai-org/GLM-5.3-BF16/blob/main/model.safetensors.index.json"}
+        m_repl_gb: {value: 37.8, source: "Derived: 18.89B non-routed params x 2 B"}
+        m_kv_tok_b: {value: 96640, source: "Derived: 78x1152 + 21x256 + MTP 1408"}
+        m_kv_read_tok_b: {value: 5632, source: "Derived: 22 indexer caches x 256 B"}
+        m_kv_read_fixed_b: {value: 186400000, source: "Derived: 2048 x 79 x 1152 B"}
+        m_deployable: 1
+      fp32:
+        label: FP32 (upcast; not servable, no quality gain)
+        compute_fmt: fp32
+        m_weights_gb: {value: 3013.3, source: "Derived: 753.33B params x 4 B"}
+        m_repl_gb: {value: 75.6, source: "Derived: 18.89B x 4 B"}
+        m_kv_tok_b: {value: 193280, source: "Derived: 2x BF16"}
+        m_kv_read_tok_b: {value: 11264, source: "Derived: 2x BF16"}
+        m_kv_read_fixed_b: {value: 372800000, source: "Derived: 2x BF16"}
+        m_deployable: {value: 0, source: "No FP32 FlashMLA/DSA/DeepGEMM/fused-MoE kernels in vLLM/SGLang"}
   dsv4pro:
-    label: DeepSeek V4 Pro
-    m_active_b: {value: 49, source: PLACEHOLDER}
-    m_layers: {value: 61, source: PLACEHOLDER}
-    m_native_ctx: {value: 1048576, source: PLACEHOLDER}
-    m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
-    m_attend_cap: {value: 4096, source: PLACEHOLDER}
-    m_attn_flop_ctx: {value: 17000000, source: PLACEHOLDER}
-    m_idx_flop_ctx: {value: 500000, source: PLACEHOLDER}
-    m_mtp_draft: {value: 1, source: PLACEHOLDER}
-    m_mtp_accept: {value: 1.7, source: PLACEHOLDER}
+    label: DeepSeek V4 Pro (0813) - 1.65T total / 49B active MoE, CSA/HCA hybrid attention
+    m_active_b: {value: 49, source: "Model card: 1.6T parameters (49B activated)", url: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro"}
+    m_layers: {value: 61, source: "config.json num_hidden_layers (30 CSA c4a + 31 HCA c128a)", url: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/raw/main/config.json"}
+    m_native_ctx: {value: 1048576, source: "config.json max_position_embeddings (YaRN x16 over 65,536)"}
+    m_ops_per_layer: {value: 2, source: "Two collectives per layer at decode"}
+    m_attend_cap: {value: 632, source: "Derived: (30 x (1024 top-k + 128 window) + 31 x 128 window) / 61 entries per layer"}
+    m_attn_flop_ctx: {value: 15990784, source: "Derived: 128 heads x 2 x (512 + 512) x 61 layers per attended entry"}
+    m_idx_flop_ctx: {value: 186368, source: "Derived: c4a indexer 64x128x2/4 x 30 + c128a attention 262,144/128 x 31 per context token"}
+    m_mtp_accept: {value: 1.7, source: "ASSUMPTION: DSpark/MTP ~2.5 accepted at low load, ~33% acceptance on random benchmarks; effective 1.7 at high concurrency"}
     precisions:
-      native: {compute_fmt: fp4, m_weights_gb: 870, m_repl_gb: 60, m_kv_tok_b: 4800, m_kv_read_tok_b: 1200, m_kv_read_fixed_b: 50000000, m_deployable: 1}
-      fp8: {compute_fmt: fp8, m_weights_gb: 1620, m_repl_gb: 60, m_kv_tok_b: 4800, m_kv_read_tok_b: 1200, m_kv_read_fixed_b: 50000000, m_deployable: 1}
-      bf16: {compute_fmt: bf16, m_weights_gb: 3200, m_repl_gb: 120, m_kv_tok_b: 9600, m_kv_read_tok_b: 2400, m_kv_read_fixed_b: 100000000, m_deployable: 1}
-      fp32: {compute_fmt: fp32, m_weights_gb: 6400, m_repl_gb: 240, m_kv_tok_b: 19200, m_kv_read_tok_b: 4800, m_kv_read_fixed_b: 200000000, m_deployable: 0}
+      native:
+        label: FP4 experts + FP8 (official 0813 checkpoint)
+        compute_fmt: fp4
+        m_weights_gb: {value: 892.7, source: "DeepSeek-V4-Pro-0813 index total_size 892,727,580,904 B (incl. 3 MTP/DSpark layers)", url: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813"}
+        m_repl_gb: {value: 30.0, source: "Derived: 26.08B non-routed params, mostly FP8 (+ BF16 2.8B), + MTP layers"}
+        m_kv_tok_b: {value: 5511, source: "Derived: FP8 attention (584 B entry) + FP8 indexer; vLLM blog 9.62 GiB/1M seq in BF16, ~2x smaller in FP8", url: "https://vllm.ai/blog/2026-04-24-deepseek-v4"}
+        m_kv_read_tok_b: {value: 1131, source: "Derived: c4a indexer 30x132/4 + c128a 31x584/128 read per context token"}
+        m_kv_read_fixed_b: {value: 22500000, source: "Derived: 30 x 1024 top-k x 584 + 61 x 128 window x 584"}
+        m_kv_seq_fixed_b: {value: 4560000, source: "Derived: 128-token sliding window x 61 layers (4.35 MiB)"}
+        m_deployable: 1
+      fp8:
+        label: FP8 (experts upcast; sgl-project/DeepSeek-V4-Pro-FP8)
+        compute_fmt: fp8
+        m_weights_gb: {value: 1606.5, source: "sgl-project/DeepSeek-V4-Pro-FP8 files 1,606,501,419,888 B", url: "https://huggingface.co/sgl-project/DeepSeek-V4-Pro-FP8"}
+        m_repl_gb: {value: 30.0, source: "Derived: as native"}
+        m_kv_tok_b: {value: 5511, source: "Derived: as native"}
+        m_kv_read_tok_b: {value: 1131, source: "Derived: as native"}
+        m_kv_read_fixed_b: {value: 22500000, source: "Derived: as native"}
+        m_kv_seq_fixed_b: {value: 4560000, source: "Derived: as native"}
+        m_deployable: 1
+      bf16:
+        label: BF16 (upcast; no official release)
+        compute_fmt: bf16
+        m_weights_gb: {value: 3301.0, source: "Derived: 1.65T params x 2 B (no official BF16 release)"}
+        m_repl_gb: {value: 52.2, source: "Derived: 26.08B x 2 B"}
+        m_kv_tok_b: {value: 9848, source: "vLLM blog: 9.62 GiB per 1M-token sequence (BF16)", url: "https://vllm.ai/blog/2026-04-24-deepseek-v4"}
+        m_kv_read_tok_b: {value: 2168, source: "Derived: 30x256/4 + 31x1024/128"}
+        m_kv_read_fixed_b: {value: 39500000, source: "Derived: 30x1024x1024 + 61x128x1024"}
+        m_kv_seq_fixed_b: {value: 8000000, source: "Derived: 7.62 MiB sliding window state"}
+        m_deployable: 1
+      fp32:
+        label: FP32 (upcast; not servable, no quality gain)
+        compute_fmt: fp32
+        m_weights_gb: {value: 6602.0, source: "Derived: 1.65T x 4 B"}
+        m_repl_gb: {value: 104.4, source: "Derived: 26.08B x 4 B"}
+        m_kv_tok_b: {value: 19696, source: "Derived: 2x BF16"}
+        m_kv_read_tok_b: {value: 4336, source: "Derived: 2x BF16"}
+        m_kv_read_fixed_b: {value: 79000000, source: "Derived: 2x BF16"}
+        m_kv_seq_fixed_b: {value: 16000000, source: "Derived: 2x BF16"}
+        m_deployable: {value: 0, source: "No FP32 kernels for CSA/HCA attention or fused MoE"}
   kimi27:
-    label: Kimi K2.7 Code (Moonshot)
-    m_active_b: {value: 32, source: PLACEHOLDER}
-    m_layers: {value: 61, source: PLACEHOLDER}
-    m_native_ctx: {value: 262144, source: PLACEHOLDER}
-    m_ops_per_layer: {value: 2, source: "EP all-to-all dispatch + combine per MoE layer"}
-    m_attend_cap: {value: 1000000000000, source: "Dense MLA attention"}
-    m_attn_flop_ctx: {value: 8500000, source: PLACEHOLDER}
-    m_idx_flop_ctx: {value: 0, source: "No sparse indexer"}
-    m_mtp_draft: {value: 0, source: PLACEHOLDER}
-    m_mtp_accept: {value: 1, source: PLACEHOLDER}
+    label: Kimi K2.7 Code (Moonshot) - 1T total / 32B active MoE, MLA, 262K native window
+    m_active_b: {value: 32, source: "Model card: 1T total / 32B active", url: "https://huggingface.co/moonshotai/Kimi-K2.7-Code"}
+    m_layers: {value: 61, source: "config.json (1 dense + 60 MoE)"}
+    m_native_ctx: {value: 262144, source: "config.json; includes YaRN x64 over 4,096; no official support beyond"}
+    m_ops_per_layer: {value: 2, source: "Two collectives per layer at decode"}
+    m_attend_cap: {value: 1000000000000, source: "Dense MLA attention (attends to every token)"}
+    m_attn_flop_ctx: {value: 8494592, source: "Derived: 64 heads x 2 x (576 + 512) x 61 layers per attended token"}
+    m_idx_flop_ctx: 0
+    m_mtp_accept: {value: 1.0, source: "No MTP layer; EAGLE3 draft (external) not assumed"}
+    m_kv_seq_fixed_b: 0
     precisions:
-      native: {compute_fmt: fp8, m_weights_gb: 594, m_repl_gb: 32, m_kv_tok_b: 40016, m_kv_read_tok_b: 40016, m_kv_read_fixed_b: 0, m_deployable: 1}
-      fp8: {compute_fmt: fp8, m_weights_gb: 1030, m_repl_gb: 16, m_kv_tok_b: 40016, m_kv_read_tok_b: 40016, m_kv_read_fixed_b: 0, m_deployable: 1}
-      bf16: {compute_fmt: bf16, m_weights_gb: 2060, m_repl_gb: 32, m_kv_tok_b: 70272, m_kv_read_tok_b: 70272, m_kv_read_fixed_b: 0, m_deployable: 1}
-      fp32: {compute_fmt: fp32, m_weights_gb: 4120, m_repl_gb: 64, m_kv_tok_b: 140544, m_kv_read_tok_b: 140544, m_kv_read_fixed_b: 0, m_deployable: 0}
+      native:
+        label: INT4 QAT (official, W4A16 kernels)
+        compute_fmt: bf16
+        m_weights_gb: {value: 595.1, source: "moonshotai/Kimi-K2.7-Code safetensors 595,148,192,736 B", url: "https://huggingface.co/moonshotai/Kimi-K2.7-Code"}
+        m_repl_gb: {value: 23.6, source: "Derived: ~11.8B non-routed params in BF16"}
+        m_kv_tok_b: {value: 35136, source: "Derived: FP8 MLA latent 576 B x 61 layers"}
+        m_kv_read_tok_b: {value: 35136, source: "Dense MLA reads the whole cache each step"}
+        m_kv_read_fixed_b: 0
+        m_deployable: 1
+      fp8:
+        label: FP8 (upcast experts)
+        compute_fmt: fp8
+        m_weights_gb: {value: 1026.5, source: "Derived: 1,014.7B expert params x 1 B + 11.8B non-routed"}
+        m_repl_gb: {value: 14.0, source: "Derived: 11.8B non-routed in FP8 (+ BF16 norms/embeddings)"}
+        m_kv_tok_b: {value: 35136, source: "Derived: FP8 KV"}
+        m_kv_read_tok_b: {value: 35136, source: "Dense MLA"}
+        m_kv_read_fixed_b: 0
+        m_deployable: 1
+      bf16:
+        label: BF16 (upcast; no quality gain over INT4 QAT)
+        compute_fmt: bf16
+        m_weights_gb: {value: 2053.0, source: "Derived: 1,026.5B x 2 B"}
+        m_repl_gb: {value: 23.6, source: "Derived: 11.8B x 2 B"}
+        m_kv_tok_b: {value: 70272, source: "Derived: BF16 MLA 1152 B x 61 layers"}
+        m_kv_read_tok_b: {value: 70272, source: "Dense MLA"}
+        m_kv_read_fixed_b: 0
+        m_deployable: 1
+      fp32:
+        label: FP32 (upcast; not servable, no quality gain)
+        compute_fmt: fp32
+        m_weights_gb: {value: 4106.0, source: "Derived: 1,026.5B x 4 B"}
+        m_repl_gb: {value: 47.2, source: "Derived: 11.8B x 4 B"}
+        m_kv_tok_b: {value: 140544, source: "Derived: 2x BF16"}
+        m_kv_read_tok_b: {value: 140544, source: "Dense MLA"}
+        m_kv_read_fixed_b: 0
+        m_deployable: {value: 0, source: "No FP32 MLA / fused-MoE kernels"}

@@ -368,7 +368,7 @@ class Builder:
             g = f"{col['model']}{r}&\"|\"&{col['workload']}{r}&\"|\"&{col['users']}{r}&\"|\"&{col['speed']}{r}"
             ws[f"{col['grp']}{r}"] = f"={g}"
             rngc = lambda c: f"${col[c]}${n0}:${col[c]}${n1}"
-            for out, metric in (("best_buy", "buy_m"), ("best_rent", "rent_best")):
+            for out, metric in (("best_buy", "buy_m"), ("best_rent", "rent_m")):
                 mn = (f"_xlfn.MINIFS({rngc(metric)},{rngc('grp')},{col['grp']}{r},{rngc('feasible')},1)")
                 ws[f"{col[out]}{r}"] = (f"=IF(AND({col['feasible']}{r}=1,{col[metric]}{r}={mn}),"
                                         f"{col['grp']}{r}&\"|1\",\"\")")
@@ -377,7 +377,7 @@ class Builder:
     def sheet_summary(self):
         ws = self.wb.create_sheet("Summary")
         header(ws, 1, ["Model", "Workload", "Users", "Speed tok/s", "Cheapest own-room ₹/month", "GPU", "Precision",
-                       "Nodes", "Cheapest rent ₹/month", "GPU (rent)", "Precision (rent)", "Best colo ₹/month",
+                       "Nodes", "Cheapest rent ₹/month (incl. MLOps staff)", "GPU (rent)", "Precision (rent)", "Best colo ₹/month",
                        "Own room per user ₹/month"], [16, 12, 8, 10, 20, 10, 10, 8, 20, 10, 12, 18, 18])
         n0, n1 = self.matrix_span
         col = self.xL
@@ -397,7 +397,7 @@ class Builder:
                         ws[f"F{r}"] = f"=IFERROR(INDEX({rng('gpu')},{mb}),\"none feasible\")"
                         ws[f"G{r}"] = f"=IFERROR(INDEX({rng('precision')},{mb}),\"\")"
                         ws[f"H{r}"] = f"=IFERROR(INDEX({rng('nodes')},{mb}),\"\")"
-                        ws[f"I{r}"] = f"=IFERROR(_xlfn.MINIFS({rng('rent_best')},{crit}),\"\")"
+                        ws[f"I{r}"] = f"=IFERROR(_xlfn.MINIFS({rng('rent_m')},{crit}),\"\")"
                         mr = f"MATCH({g}&\"|1\",{rng('best_rent')},0)"
                         ws[f"J{r}"] = f"=IFERROR(INDEX({rng('gpu')},{mr}),\"\")"
                         ws[f"K{r}"] = f"=IFERROR(INDEX({rng('precision')},{mr}),\"\")"

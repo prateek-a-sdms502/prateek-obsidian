@@ -1,6 +1,6 @@
 # GPU platforms. One "node" = the unit you buy/rent: an 8-GPU server, or a 72-GPU NVL72 rack.
 # Specs: vendor datasheets (dense, no sparsity). Prices: research_notes/.../hardware_prices.md (USD, ex-tax, ex-shipping, Oct 2026).
-# Cloud rates: research_notes/.../cloud_rental_prices.md.
+# Cloud rates: research_notes/Self hosting LLM cost Pune/cloud_rental_prices.md (ex-GST, Oct 2026). 0 = not offered.
 gpus:
   h200:
     label: NVIDIA HGX H200 (8x141 GB)
@@ -17,10 +17,12 @@ gpus:
     g_lat_us: {value: 30, source: "ASSUMPTION: NVLink all-to-all dispatch/combine latency at decode, calibrate with benchmark"}
     g_node_usd: {value: 323685, source: "Supermicro eStore SYS-821GE-TNHR (range $300k-420k)", url: "https://store.supermicro.com/us_en/systems/gpu.html?p=2", date: "2026-10-19"}
     g_rack_kw: {value: 30, source: "Air-cooled racks <= 30 kW (2 nodes/rack)"}
-    g_rate_od_usd: {value: 3.0, source: PLACEHOLDER}
-    g_rate_res1_usd: {value: 2.4, source: PLACEHOLDER}
-    g_rate_res3_usd: {value: 2.0, source: PLACEHOLDER}
-    g_rate_in_inr: {value: 280, source: PLACEHOLDER}
+    g_rate_od_usd: {value: 4.47, source: "DigitalOcean H200 on-demand (Nebius $5.40, Together $5.99)", url: "https://www.digitalocean.com/pricing/gpu-droplets", date: "2026-10-19"}
+    g_rate_res1_usd: {value: 3.4, source: "DigitalOcean H200 12-month reserved (Together 91-180 day $3.99)", url: "https://www.digitalocean.com/pricing/gpu-droplets", date: "2026-10-19"}
+    g_rate_res3_usd: {value: 2.37, source: "Neysa Velocis 8xH200 36-month term $13,810.58/node-month (India-hosted, USD-billed)", url: "https://neysa.ai/pricing", date: "2026-10-19"}
+    g_rate_in_od_inr: {value: 502.55, source: "E2E Networks H200 on-demand (Tata Vayu Rs531)", url: "https://www.e2enetworks.com/pricing.md", date: "2026-10-19"}
+    g_rate_in_mo_inr: {value: 462.65, source: "E2E Networks H200 committed", url: "https://www.e2enetworks.com/pricing.md", date: "2026-10-19"}
+    g_rate_in_res3_inr: {value: 225.2, source: "Neysa 36-month $2.37 x Rs95.0 (Indian DC)", url: "https://neysa.ai/pricing", date: "2026-10-19"}
   b200:
     label: NVIDIA HGX B200 (8x180 GB)
     g_hbm_gb: {value: 180, source: "NVIDIA HGX B200 (8x180 GB = 1.44 TB)"}
@@ -35,10 +37,12 @@ gpus:
     g_lat_us: {value: 25, source: "ASSUMPTION: NVLink5 all-to-all latency at decode, calibrate"}
     g_node_usd: {value: 395000, source: "Exxact / Supermicro HGX B200 8-GPU ($384k-403k; range $340k-515k)", url: "https://www.exxactcorp.com/Exxact-TS4-124903244-E124903244", date: "2026-07..10"}
     g_rack_kw: {value: 30, source: "Air-cooled racks <= 30 kW (2 nodes/rack)"}
-    g_rate_od_usd: {value: 4.5, source: PLACEHOLDER}
-    g_rate_res1_usd: {value: 3.6, source: PLACEHOLDER}
-    g_rate_res3_usd: {value: 3.0, source: PLACEHOLDER}
-    g_rate_in_inr: {value: 420, source: PLACEHOLDER}
+    g_rate_od_usd: {value: 6.69, source: "Lambda 8xB200 on-demand (often out of stock; Crusoe/Nebius $8.50)", url: "https://lambda.ai/pricing", date: "2026-10-19"}
+    g_rate_res1_usd: {value: 6.79, source: "Together AI B200 91-180-day reservation", url: "https://www.together.ai/pricing", date: "2026-10-19"}
+    g_rate_res3_usd: {value: 7.09, source: "Google Cloud A4 B200 3-year committed use", url: "https://cloud.google.com/products/compute/pricing/accelerator-optimized", date: "2026-10-19"}
+    g_rate_in_od_inr: {value: 759.05, source: "E2E Networks B200 on-demand (8-GPU via sales)", url: "https://www.e2enetworks.com/pricing.md", date: "2026-10-19"}
+    g_rate_in_mo_inr: {value: 473.0, source: "Yotta Shakti B200 monthly term (site may be stale)", url: "https://shakticloud.ai/pricing", date: "2026-10-19"}
+    g_rate_in_res3_inr: {value: 378.0, source: "Yotta Shakti B200 3-year term", url: "https://shakticloud.ai/pricing", date: "2026-10-19"}
   b300:
     label: NVIDIA HGX B300 (8x288 GB)
     g_hbm_gb: {value: 288, source: "NVIDIA HGX B300 (8x288 GB); some SKUs 270 GB"}
@@ -53,10 +57,12 @@ gpus:
     g_lat_us: {value: 25, source: "ASSUMPTION: NVLink5 all-to-all latency at decode, calibrate"}
     g_node_usd: {value: 545173, source: "Supermicro eStore HGX B300 (BIZON $496,639; range $375k-700k)", url: "https://store.supermicro.com/us_en/systems/gpu.html", date: "2026-07..10"}
     g_rack_kw: {value: 30, source: "Air-cooled racks <= 30 kW (2 nodes/rack)"}
-    g_rate_od_usd: {value: 5.5, source: PLACEHOLDER}
-    g_rate_res1_usd: {value: 4.4, source: PLACEHOLDER}
-    g_rate_res3_usd: {value: 3.6, source: PLACEHOLDER}
-    g_rate_in_inr: {value: 520, source: PLACEHOLDER}
+    g_rate_od_usd: {value: 9.5, source: "Nebius B300 on-demand (Together $9.99)", url: "https://nebius.com/prices", date: "2026-10-19"}
+    g_rate_res1_usd: {value: 7.94, source: "DigitalOcean B300 reserved", url: "https://www.digitalocean.com/pricing/gpu-droplets", date: "2026-10-19"}
+    g_rate_res3_usd: {value: 7.94, source: "No cheaper published 3-yr B300 rate found; DigitalOcean reserved used (AWS Hyderabad 3-yr SP $10.84)", url: "https://www.digitalocean.com/pricing/gpu-droplets", date: "2026-10-19"}
+    g_rate_in_od_inr: {value: 2389.0, source: "AWS Hyderabad p6-b300 on-demand $25.10/GPU-h x Rs95.18 (only hourly B300 in India)", url: "https://aws.amazon.com/ec2/pricing/on-demand/", date: "2026-10-19"}
+    g_rate_in_mo_inr: {value: 1056.0, source: "Yotta Shakti B300 1-year reserved", url: "https://shakticloud.ai/pricing", date: "2026-10-19"}
+    g_rate_in_res3_inr: {value: 672.0, source: "Yotta Shakti B300 3-year reserved", url: "https://shakticloud.ai/pricing", date: "2026-10-19"}
   mi355x:
     label: AMD Instinct MI355X (8x288 GB)
     g_hbm_gb: {value: 288, source: "AMD MI355X datasheet"}
@@ -71,10 +77,12 @@ gpus:
     g_lat_us: {value: 35, source: "ASSUMPTION: Infinity Fabric all-to-all latency at decode, calibrate"}
     g_node_usd: {value: 330000, source: "INFERRED: no verified 2026 US price; EU listing ~EUR261k ex-VAT, config unverified; range ~$280k-400k", url: "https://smicro.eu/supermicro-as-4126gs-nmr-lcc-g1-2", date: "2026"}
     g_rack_kw: {value: 60, source: "MI355X is direct-liquid-cooled (4U DLC) -> liquid cooling, 4 nodes/rack"}
-    g_rate_od_usd: {value: 3.0, source: PLACEHOLDER}
-    g_rate_res1_usd: {value: 2.5, source: PLACEHOLDER}
-    g_rate_res3_usd: {value: 2.1, source: PLACEHOLDER}
-    g_rate_in_inr: {value: 300, source: PLACEHOLDER}
+    g_rate_od_usd: {value: 8.6, source: "Oracle OCI MI355X list (uniform across regions; India capacity unverified)", url: "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD", date: "2026-10-19"}
+    g_rate_res1_usd: {value: 2.95, source: "TensorWave MI355X contract 'from' rate via GetDeploying (Aug 2026)", url: "https://getdeploying.com/gpus/amd-mi355x", date: "2026-10-19"}
+    g_rate_res3_usd: {value: 2.95, source: "TensorWave MI355X contract 'from' rate (no separate 3-yr rate found)", url: "https://getdeploying.com/gpus/amd-mi355x", date: "2026-10-19"}
+    g_rate_in_od_inr: {value: 0, source: "Not offered by Indian providers (Oracle INR list Rs821.69 is global capacity)", url: "", date: "2026-10-19"}
+    g_rate_in_mo_inr: {value: 0, source: "Not offered by Indian providers", url: "", date: "2026-10-19"}
+    g_rate_in_res3_inr: {value: 0, source: "Not offered by Indian providers", url: "", date: "2026-10-19"}
   gb300nvl72:
     label: NVIDIA GB300 NVL72 (rack, 72x288 GB)
     g_hbm_gb: {value: 288, source: "NVIDIA GB300 NVL72 (~21 TB HBM per rack)"}
@@ -89,7 +97,9 @@ gpus:
     g_lat_us: {value: 30, source: "ASSUMPTION: NVLink-72 all-to-all latency at decode, calibrate"}
     g_node_usd: {value: 5032000, source: "~$5.0M per rack ex-works from Aug-2026 POs + ~$32k in-rack CDU (range $3.7M-6.5M)", url: "https://www.datagravity.dev/p/how-much-does-an-nvidia-nvl72-cost", date: "2026-08"}
     g_rack_kw: {value: 155, source: "One liquid-cooled rack"}
-    g_rate_od_usd: {value: 6.5, source: PLACEHOLDER}
-    g_rate_res1_usd: {value: 5.2, source: PLACEHOLDER}
-    g_rate_res3_usd: {value: 4.3, source: PLACEHOLDER}
-    g_rate_in_inr: {value: 650, source: PLACEHOLDER}
+    g_rate_od_usd: {value: 18.0, source: "Oracle OCI GB300 list per GPU-hour", url: "https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD", date: "2026-10-19"}
+    g_rate_res1_usd: {value: 12.0, source: "ASSUMPTION: GB300 reserved-only elsewhere (Together/CoreWeave quote); CoreWeave GB200 $10.50 + premium", url: "https://www.coreweave.com/pricing", date: "2026-10-19"}
+    g_rate_res3_usd: {value: 12.0, source: "ASSUMPTION: as 1-year", url: "https://www.coreweave.com/pricing", date: "2026-10-19"}
+    g_rate_in_od_inr: {value: 0, source: "Not offered in India", url: "", date: "2026-10-19"}
+    g_rate_in_mo_inr: {value: 0, source: "Not offered in India", url: "", date: "2026-10-19"}
+    g_rate_in_res3_inr: {value: 0, source: "Not offered in India", url: "", date: "2026-10-19"}
