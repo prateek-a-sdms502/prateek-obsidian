@@ -33,22 +33,6 @@ def close(a, b):
     return math.isclose(a, b, rel_tol=RTOL, abs_tol=1e-9)
 
 
-def recalc(path):
-    if shutil.which("soffice") or shutil.which("libreoffice"):
-        out = subprocess.run([sys.executable, str(RECALC), str(path), "300"], capture_output=True, text=True)
-        res = json.loads(out.stdout)
-        if res.get("status") != "success":
-            raise SystemExit(f"recalc problem: {json.dumps(res)[:2000]}")
-        return load_workbook(path, data_only=True), "LibreOffice"
-    import formulas
-    xl = formulas.ExcelModel().loads(str(path)).finish()
-    sol = xl.calculate()
-    d = Path(tempfile.mkdtemp())
-    xl.write(dirpath=str(d))
-    written = next(d.glob("*.xlsx")) if list(d.glob("*.xlsx")) else next(d.glob("*.XLSX"))
-    return load_workbook(written, data_only=True), "formulas"
-
-
 def matrix_values(wb):
     ws = wb["Matrix"]
     hdr = [c.value for c in ws[2]]
@@ -58,10 +42,41 @@ def matrix_values(wb):
         yield dict(zip(hdr, row))
 
 
+def recalc(path):
+    """Return (rows of the Matrix sheet as dicts, engine name)."""
+    if shutil.which("soffice") or shutil.which("libreoffice"):
+        out = subprocess.run([sys.executable, str(RECALC), str(path), "600"], capture_output=True, text=True)
+        res = json.loads(out.stdout)
+        if res.get("status") != "success":
+            raise SystemExit(f"recalc problem: {json.dumps(res)[:2000]}")
+        return list(matrix_values(load_workbook(path, data_only=True))), "LibreOffice"
+    import re
+    import formulas
+    from openpyxl.utils import column_index_from_string
+    sol = formulas.ExcelModel().loads(str(path)).finish().calculate()
+    vals = {}
+    for k, v in sol.items():
+        m = re.match(r"'\[[^\]]+\]([^']+)'!([A-Z]+)(\d+)$", k)
+        if m and m.group(1).upper() == "MATRIX":
+            vals[(int(m.group(3)), column_index_from_string(m.group(2)))] = v.value[0][0] if hasattr(v, "value") else v
+    ws = load_workbook(path)["Matrix"]
+    hdr = [c.value for c in ws[2]]
+    rows = []
+    for r in range(4, ws.max_row + 1):
+        if ws.cell(row=r, column=1).value is None:
+            continue
+        row = {}
+        for ci, h in enumerate(hdr, 1):
+            cell = ws.cell(row=r, column=ci).value
+            row[h] = vals.get((r, ci), cell) if isinstance(cell, str) and cell.startswith("=") else cell
+        rows.append(row)
+    return rows, "formulas"
+
+
 def check_excel(path, data, lv_for):
-    wb, how = recalc(path)
+    xrows, how = recalc(path)
     bad, n = [], 0
-    for xrow in matrix_values(wb):
+    for xrow in xrows:
         keys = {k: xrow[k] for k in ROW_KEYS}
         v = run_llm(data.llm_row(**keys, **lv_for(keys)))
         n += 1
