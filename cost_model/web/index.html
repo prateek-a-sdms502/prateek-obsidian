@@ -1,0 +1,313 @@
+<title>Pune GPU Cost Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control rail on the left (stacks on phones), results column on the right: verdict, cost tiles, sizing, breakdown, GPU comparison, OCR. */
+:root {
+  --bg: #f3f5f6; --panel: #ffffff; --ink: #14222b; --muted: #5b6b75; --line: #d9e0e4;
+  --accent: #0b6e78; --accent-soft: #dcefef; --gold: #a86b12; --gold-soft: #f6ead6;
+  --good: #1f7a3f; --good-soft: #dff1e5; --bad: #a3322a; --bad-soft: #f7e1de;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f171c; --panel: #16222a; --ink: #e4ecef; --muted: #93a5ae; --line: #26363f;
+  --accent: #4fb8c1; --accent-soft: #163a3f; --gold: #e0a84a; --gold-soft: #3a2d17;
+  --good: #6cc98d; --good-soft: #173322; --bad: #ec8a80; --bad-soft: #3d1e1b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f171c; --panel: #16222a; --ink: #e4ecef; --muted: #93a5ae; --line: #26363f;
+  --accent: #4fb8c1; --accent-soft: #163a3f; --gold: #e0a84a; --gold-soft: #3a2d17;
+  --good: #6cc98d; --good-soft: #173322; --bad: #ec8a80; --bad-soft: #3d1e1b; color-scheme: dark }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 20px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 28px; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+.stamp { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+@media (max-width: 860px) { aside { position: static; } }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+legend { font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 4px; }
+label { display: grid; gap: 4px; font-weight: 500; font-size: 13px; }
+select, input[type=number] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); width: 100%; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.rowlab { display: flex; justify-content: space-between; gap: 8px; }
+.rowlab output { font-family: var(--mono); color: var(--accent); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: inherit; font-size: 12px; padding: 6px 4px; border: 0; background: var(--bg); color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); font-weight: 600; }
+button:focus-visible, select:focus-visible, input:focus-visible, tr:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+main { display: grid; gap: 20px; min-width: 0; }
+.verdict { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid transparent; }
+.chip.ok { background: var(--good-soft); color: var(--good); }
+.chip.no { background: var(--bad-soft); color: var(--bad); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+.chip.warn { background: var(--gold-soft); color: var(--gold); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 620px) { .tiles { grid-template-columns: minmax(0, 1fr); } }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 2px; }
+.tile.best { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tile h3 { margin: 0; font-family: var(--display); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.tile .big { font-family: var(--display); font-weight: 800; font-size: 30px; font-variant-numeric: tabular-nums; }
+.tile .big small { font-size: 14px; font-weight: 500; color: var(--muted); }
+.tile .note { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+section.card h2 { font-family: var(--display); font-size: 16px; font-weight: 700; margin: 0 0 4px; text-wrap: balance; }
+section.card p.hint { color: var(--muted); margin: 0 0 12px; font-size: 13px; max-width: 75ch; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 18px; }
+.fact { display: grid; gap: 0; border-top: 1px solid var(--line); padding-top: 6px; }
+.fact span { color: var(--muted); font-size: 12px; }
+.fact b { font-family: var(--mono); font-weight: 500; font-size: 15px; font-variant-numeric: tabular-nums; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 620px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child, th.l, td.l { text-align: left; }
+th { font-family: var(--display); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+td { font-family: var(--mono); font-size: 13px; }
+tbody tr.pick { cursor: pointer; }
+tbody tr.pick:hover { background: var(--accent-soft); }
+tr.cur { background: var(--gold-soft); }
+td.dim { color: var(--muted); }
+.kv td:first-child { font-family: var(--body); color: var(--muted); }
+footer { color: var(--muted); font-size: 12px; max-width: 90ch; display: grid; gap: 6px; }
+footer code { font-family: var(--mono); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Pune GPU Cost Planner</h1>
+      <p class="sub">Self-hosting cost for one standalone model deployment in Baner, Pune: buy and run your own room, buy and co-locate, or rent. Same formulas as the Excel calculator.</p>
+    </div>
+    <div class="stamp">Prices and tariffs as of 19 Oct 2026 · INR ex-GST</div>
+  </header>
+
+  <div class="grid">
+    <aside aria-label="Scenario">
+      <fieldset>
+        <legend>Model</legend>
+        <label for="model">Model<select id="model"></select></label>
+        <label for="precision">Precision<select id="precision"></select></label>
+        <label for="gpu">GPU platform<select id="gpu"></select></label>
+      </fieldset>
+      <fieldset>
+        <legend>Load</legend>
+        <label for="workload">Workload<select id="workload"></select></label>
+        <label for="users"><span class="rowlab">Concurrent users <output id="usersOut"></output></span>
+          <input type="range" id="users" min="10" max="150" step="5" value="90"></label>
+        <label for="speed"><span class="rowlab">Speed per user <output id="speedOut"></output></span>
+          <input type="range" id="speed" min="10" max="60" step="5" value="30"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Operation</legend>
+        <div class="seg" role="group" aria-label="Hours"><button type="button" id="up24" aria-pressed="true">24/7</button><button type="button" id="upbh" aria-pressed="false">Business hours</button></div>
+        <div class="seg" role="group" aria-label="Horizon"><button type="button" id="y3" aria-pressed="true">3 years</button><button type="button" id="y5" aria-pressed="false">5 years</button></div>
+        <div class="seg" role="group" aria-label="Spare"><button type="button" id="sp0" aria-pressed="true">No spare</button><button type="button" id="sp1" aria-pressed="false">N+1 spare</button></div>
+        <div class="seg" role="group" aria-label="GST credit"><button type="button" id="itc1" aria-pressed="true">GST credit</button><button type="button" id="itc0" aria-pressed="false">No credit</button></div>
+        <div class="seg" role="group" aria-label="Power tariff"><button type="button" id="tc" aria-pressed="true">Commercial</button><button type="button" id="ti" aria-pressed="false">IT/ITeS unit</button></div>
+        <label for="fx">INR per USD<input type="number" id="fx" min="60" max="150" step="0.01" value="95.18"></label>
+      </fieldset>
+    </aside>
+
+    <main>
+      <div class="verdict" id="verdict" aria-live="polite"></div>
+      <div class="tiles">
+        <div class="tile" id="tRoom"><h3>Own room, Baner <span id="tRoomTag"></span></h3><div class="big" id="vRoom"></div><div class="note" id="nRoom"></div></div>
+        <div class="tile" id="tColo"><h3>Colocation <span id="tColoTag"></span></h3><div class="big" id="vColo"></div><div class="note" id="nColo"></div></div>
+        <div class="tile" id="tRent"><h3>Rent cloud GPUs <span id="tRentTag"></span></h3><div class="big" id="vRent"></div><div class="note" id="nRent"></div></div>
+      </div>
+
+      <section class="card">
+        <h2>Sizing</h2>
+        <p class="hint" id="sizingHint"></p>
+        <div class="facts" id="facts"></div>
+      </section>
+
+      <div class="two">
+        <section class="card">
+          <h2>Own room: one-time cost</h2>
+          <div class="scroll"><table class="kv"><tbody id="capex"></tbody></table></div>
+        </section>
+        <section class="card">
+          <h2>Own room: every month</h2>
+          <div class="scroll"><table class="kv"><tbody id="opex"></tbody></table></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2>Every GPU and precision for this load</h2>
+        <p class="hint">Sorted by own-room cost. Click a row to switch to it. Rent includes one MLOps engineer.</p>
+        <div class="scroll"><table><thead><tr><th class="l">GPU</th><th class="l">Precision</th><th>Nodes</th><th>tok/s at peak</th><th>Own room</th><th>Colo</th><th>Rent</th><th class="l">Status</th></tr></thead><tbody id="cmp"></tbody></table></div>
+      </section>
+
+      <section class="card">
+        <h2>Chandra OCR 2</h2>
+        <p class="hint">Sized by pages per hour at peak, not by users. Needs a paid Datalab licence for companies above $2M revenue (not included).</p>
+        <div class="seg" role="group" aria-label="OCR volume" style="grid-template-columns: repeat(3, 1fr); max-width: 420px; margin-bottom: 12px;">
+          <button type="button" id="oLight" aria-pressed="false">1,000 pages/h</button><button type="button" id="oMedium" aria-pressed="true">10,000 pages/h</button><button type="button" id="oHeavy" aria-pressed="false">50,000 pages/h</button>
+        </div>
+        <div class="scroll"><table><thead><tr><th class="l">GPU</th><th class="l">Precision</th><th>GPUs</th><th>Rent / month</th><th>Bought / month</th><th>Rent per 1k pages</th><th>Bought per 1k pages</th></tr></thead><tbody id="ocr"></tbody></table></div>
+      </section>
+
+      <footer>
+        <p>Throughput is modelled, not benchmarked: calibrated on 12 published 2026 measurements (mean error 2.9%, worst 17%). GPU and model pairs without published data carry about ±25%. MI355X purchase price is inferred and its cheapest rental is a "from" contract rate, so compare against the NVIDIA rows.</p>
+        <p>Buying = hardware landed in India (0% duty on servers, 10% on switches, 18% IGST) converted to a monthly charge at 11% cost of capital with 20% resale, plus power, cooling, UPS/DG, staff, space, insurance and AMC. Full sources: <code>reports/Self hosting LLM cost Pune.md</code> and the Excel calculator.</p>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script src="model.js"></script>
+<script>
+(function () {
+  const M = window.CostModel, D = M.data, $ = id => document.getElementById(id);
+  const NAMES = { glm53: "GLM-5.3", dsv4pro: "DeepSeek V4 Pro", kimi27: "Kimi K2.7 Code" };
+  const GPUN = { h200: "8× H200", b200: "8× B200", b300: "8× B300", mi355x: "8× MI355X", gb300nvl72: "GB300 NVL72 rack" };
+  const WL = { chat: "Chat / Q&A", mixed: "Mixed (70% chat, 30% agents)", agent_128k: "Coding agents, summarise at 128k", agent_1m: "Coding agents, full 1M window", stress_1m: "Worst case: everyone at the ceiling" };
+  const PREC = { native: "Native (official)", fp8: "FP8", bf16: "BF16", fp32: "FP32" };
+  const OCRG = { l40s: "L40S", rtxpro6000: "RTX PRO 6000", h100: "H100" };
+  const st = { uptime: "24x7", years: 3, spare: 0, itc: 1, tariff: 0, ocr: "medium" };
+
+  const lakh = x => (x / 1e5).toLocaleString("en-IN", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const crore = x => (x / 1e7).toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  const inr = x => "₹" + Math.round(x).toLocaleString("en-IN");
+  const num = (x, d = 0) => x.toLocaleString("en-IN", { maximumFractionDigits: d, minimumFractionDigits: d });
+
+  function fill(sel, opts, val) {
+    sel.innerHTML = "";
+    for (const [k, v] of opts) { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.appendChild(o); }
+    if (val && opts.some(o => o[0] === val)) sel.value = val;
+  }
+  fill($("model"), D.scen.grid.models.map(m => [m, NAMES[m]]), "glm53");
+  fill($("gpu"), D.scen.grid.gpus.map(g => [g, GPUN[g]]), "b200");
+  fill($("workload"), D.scen.grid.workloads.map(w => [w, WL[w]]), "agent_128k");
+  function precOpts() {
+    const m = $("model").value, cur = $("precision").value;
+    const ps = Object.keys(D.models[m].precisions);
+    fill($("precision"), ps.map(p => [p, (p === "fp8" && m === "glm53") ? "FP8 (official)" : PREC[p]]), ps.includes(cur) ? cur : ps[0]);
+  }
+  precOpts();
+
+  function levers() { return { uptime: st.uptime, itc: st.itc, spare: st.spare, years: st.years }; }
+  function run(k) {
+    const row = M.llmRow(k, levers());
+    row.s_it_tariff = st.tariff; row.s_fx = parseFloat($("fx").value) || 95.18;
+    return M.llm(row);
+  }
+  function reason(v) {
+    if (v.m_deployable !== 1) return "Not servable: no FP32 kernels";
+    if (v.fits_repl !== 1) return "Weights don't fit";
+    if (v.speed_ok !== 1) return "Speed target out of reach";
+    return "";
+  }
+  function keys(over) {
+    return Object.assign({ model: $("model").value, precision: $("precision").value, gpu: $("gpu").value,
+      workload: $("workload").value, users: +$("users").value, speed: +$("speed").value }, over || {});
+  }
+
+  function render() {
+    $("usersOut").textContent = $("users").value;
+    $("speedOut").textContent = $("speed").value + " tok/s";
+    const k = keys(), v = run(k), why = reason(v);
+    const fx = v.s_fx;
+
+    // verdict chips
+    const chips = [];
+    chips.push(why ? `<span class="chip no">${why}</span>` : `<span class="chip ok">Feasible</span>`);
+    chips.push(`<span class="chip info">${v.bound === 1 ? "Limited by memory (KV cache)" : "Limited by speed"}</span>`);
+    if (v.needs_ht === 1) chips.push(`<span class="chip warn">Needs an HT connection (over 187 kVA)</span>`);
+    if (k.model === "kimi27" && /agent|stress/.test(k.workload)) chips.push(`<span class="chip warn">Kimi window is 262k: summarises at ${num(v.c_T)}</span>`);
+    if (k.precision === "bf16" && k.model !== "glm53") chips.push(`<span class="chip warn">BF16 is an upcast: no quality gain</span>`);
+    if (k.gpu === "mi355x") chips.push(`<span class="chip warn">MI355X price is an estimate</span>`);
+    $("verdict").innerHTML = chips.join("");
+
+    // tiles
+    const opts = [["Room", v.buy_m], ["Colo", v.colo_m], ["Rent", v.rent_m]];
+    const min = Math.min(...opts.map(o => o[1]));
+    for (const [id, val] of opts) {
+      $("t" + id).classList.toggle("best", !why && val === min);
+      $("t" + id + "Tag").innerHTML = !why && val === min ? '<span class="chip ok">cheapest</span>' : "";
+      $("v" + id).innerHTML = `₹${lakh(val)} <small>lakh / month</small>`;
+    }
+    $("nRoom").textContent = `$${num(v.buy_m / fx)}/mo · capex ₹${crore(v.buy_capex)} cr · pays back vs rent in ${v.breakeven_m >= 999 ? "never" : num(v.breakeven_m) + " months"}`;
+    $("nColo").textContent = `$${num(v.colo_m / fx)}/mo · ${v.g_rack_kw > 30 ? "liquid-cooled rack, Navi Mumbai" : "air-cooled, Pune"}`;
+    const rentPick = st.uptime === "bh" ? "hourly, business hours" : "cheapest commitment";
+    $("nRent").textContent = `$${num(v.rent_m / fx)}/mo · ${rentPick} · incl. ₹${lakh(v.staff_cloud_m)} L staff`;
+
+    // sizing facts
+    $("sizingHint").textContent = `${NAMES[k.model]} · ${PREC[k.precision] || k.precision} · ${GPUN[k.gpu]} · ${WL[k.workload]} · ${k.users} users at ${k.speed} tok/s`;
+    const facts = [
+      ["Nodes (incl. spare)", num(v.nodes)], ["GPUs", num(v.gpus)], ["Replicas × nodes each", `${num(v.rep_total)} × ${num(v.nodes_rep)}`],
+      ["Sequences in flight (p99)", num(v.active_p99, 1)], ["Speed per user at peak", num(v.speed_actual, 1) + " tok/s"], ["First token (idle)", num(v.ttft, 2) + " s"],
+      ["Weights", num(v.m_weights_gb) + " GB"], ["KV needed / capacity per replica", `${num(v.kv_need_gb)} / ${num(v.kv_cap_gb)} GB`],
+      ["Mean context per sequence", num(v.ctx_mean) + " tokens"], ["Extra output for summaries", num(v.cmp_out_overhead * 100) + "%"],
+      ["IT load (max)", num(v.it_kw_max, 1) + " kW"], ["Contract demand", num(v.kva_it) + " kVA"],
+      ["Output tokens / month", num(v.out_tok_m / 1e6) + " M"], ["Own room per 1M output tokens", inr(v.per_mtok_out_buy)],
+      ["Own room per user / month", inr(v.per_user_buy)], ["Rent per user / month", inr(v.per_user_rent)],
+    ];
+    $("facts").innerHTML = facts.map(([a, b]) => `<div class="fact"><span>${a}</span><b>${b}</b></div>`).join("");
+
+    // breakdowns
+    const cap = [["Servers, network, storage (landed)", v.hw_landed], ["Electrical and HT connection", v.fac_elec], ["UPS and batteries", v.fac_ups], ["Diesel generator", v.fac_dg],
+      ["Cooling", v.fac_cool], ["Civil, fire, floor reinforcement", v.fac_civil], ["Facility total incl. GST and contingency", v.fac_capex], ["Total capex", v.buy_capex]];
+    $("capex").innerHTML = cap.map(([a, b], i) => `<tr${i >= 6 ? ' style="font-weight:600"' : ""}><td>${a}</td><td>${inr(b)}</td></tr>`).join("");
+    const op = [["Capex recovery (11%, 20% resale)", v.buy_capex_m], ["Electricity", v.power_m], ["DG diesel", v.diesel_m], ["Staff", v.staff_room_m],
+      ["Space rent", v.space_m], ["Insurance", v.insure_m], ["AMC (hardware + facility)", v.hw_amc_m + v.fac_amc_m], ["Battery reserve + internet", v.batt_m + v.f_bw_inr * v.gst_svc], ["All-in per month", v.buy_m]];
+    $("opex").innerHTML = op.map(([a, b], i) => `<tr${i === op.length - 1 ? ' style="font-weight:600"' : ""}><td>${a}</td><td>${inr(b)}</td></tr>`).join("");
+
+    // comparison
+    const rows = [];
+    for (const g of D.scen.grid.gpus) for (const p of Object.keys(D.models[k.model].precisions)) {
+      const r = run(keys({ gpu: g, precision: p }));
+      rows.push({ g, p, r, why: reason(r) });
+    }
+    rows.sort((a, b) => (!!a.why - !!b.why) || a.r.buy_m - b.r.buy_m);
+    $("cmp").innerHTML = rows.map(({ g, p, r, why }) => {
+      const cur = g === k.gpu && p === k.precision;
+      return `<tr class="pick${cur ? " cur" : ""}" tabindex="0" data-g="${g}" data-p="${p}">
+        <td>${GPUN[g]}</td><td class="l">${PREC[p] || p}</td><td>${num(r.nodes)}</td><td>${num(r.speed_actual, 1)}</td>
+        <td class="${why ? "dim" : ""}">₹${lakh(r.buy_m)} L</td><td class="${why ? "dim" : ""}">₹${lakh(r.colo_m)} L</td><td class="${why ? "dim" : ""}">₹${lakh(r.rent_m)} L</td>
+        <td class="l">${why ? `<span class="chip no">${why}</span>` : '<span class="chip ok">OK</span>'}</td></tr>`;
+    }).join("");
+
+    // OCR
+    const orows = [];
+    for (const [g, gd] of Object.entries(D.ocr.gpus)) for (const p of Object.keys(gd.precisions)) {
+      const row = M.ocrRow({ gpu: g, precision: p, tier: st.ocr }, levers());
+      row.s_it_tariff = st.tariff; row.s_fx = parseFloat($("fx").value) || 95.18;
+      orows.push({ g, p, r: M.ocr(row) });
+    }
+    orows.sort((a, b) => Math.min(a.r.q_rent_m, a.r.q_room_m) - Math.min(b.r.q_rent_m, b.r.q_room_m));
+    $("ocr").innerHTML = orows.map(({ g, p, r }, i) => `<tr${i === 0 ? ' class="cur"' : ""}><td>${OCRG[g]}</td><td class="l">${PREC[p]}</td><td>${num(r.q_gpus)}</td>
+      <td>${inr(r.q_rent_m)}</td><td>${inr(r.q_room_m)}</td><td>${inr(r.q_per_1k_rent)}</td><td>${inr(r.q_per_1k_room)}</td></tr>`).join("");
+  }
+
+  function seg(a, b, key, va, vb) {
+    const set = val => { st[key] = val; $(a).setAttribute("aria-pressed", val === va); $(b).setAttribute("aria-pressed", val === vb); render(); };
+    $(a).addEventListener("click", () => set(va)); $(b).addEventListener("click", () => set(vb));
+  }
+  seg("up24", "upbh", "uptime", "24x7", "bh");
+  seg("y3", "y5", "years", 3, 5);
+  seg("sp0", "sp1", "spare", 0, 1);
+  seg("itc1", "itc0", "itc", 1, 0);
+  seg("tc", "ti", "tariff", 0, 1);
+  for (const [id, t] of [["oLight", "light"], ["oMedium", "medium"], ["oHeavy", "heavy"]]) {
+    $(id).addEventListener("click", () => { st.ocr = t; for (const x of ["oLight", "oMedium", "oHeavy"]) $(x).setAttribute("aria-pressed", x === id); render(); });
+  }
+  $("model").addEventListener("change", () => { precOpts(); render(); });
+  for (const id of ["precision", "gpu", "workload", "users", "speed", "fx"]) $(id).addEventListener("input", render);
+  const pick = tr => { $("gpu").value = tr.dataset.g; $("precision").value = tr.dataset.p; render(); };
+  $("cmp").addEventListener("click", e => { const tr = e.target.closest("tr[data-g]"); if (tr) pick(tr); });
+  $("cmp").addEventListener("keydown", e => { const tr = e.target.closest("tr[data-g]"); if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pick(tr); } });
+  render();
+})();
+</script>

@@ -6,7 +6,7 @@ globals:
   s_fx: {value: 95.18, source: "INR per USD, open.er-api.com (E2E lists imply 95.0, Oracle 95.5)", date: "2026-10-19"}
   s_bh_hours: {value: 220, source: "10 h/day x 22 working days"}
   s_usage_hours: {value: 220, source: "ASSUMPTION: users present ~10 h/day x 22 days even when the system runs 24/7"}
-  s_it_tariff: {value: 1, source: "Lever: 1 = registered IT/ITeS or data-centre unit (Maharashtra IT/ITeS Policy 2023: industrial tariff + electricity-duty exemption); 0 = HT commercial"}
+  s_it_tariff: {value: 0, source: "Stark Digital is not a registered IT/ITeS unit (user, 2026-10-19), so HT commercial applies. Lever: 1 = registered IT/ITeS or data-centre unit (Maharashtra IT/ITeS Policy 2023: industrial tariff + electricity-duty exemption); 0 = HT commercial"}
   # cloud extras
   p_storage_tb_inr: {value: 2000, source: "ASSUMPTION: block/NFS storage ~Rs2,000 per TB-month for weights"}
   p_cloud_gst: {value: 0.18, source: "18% GST (Indian providers & AWS/GCP India entities); 18% IGST under reverse charge on foreign billing, creditable"}
