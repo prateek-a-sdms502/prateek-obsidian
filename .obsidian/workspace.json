@@ -25,12 +25,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "suraksha_ai_pipeline.md",
+                "file": "19th Oct 2026.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "suraksha_ai_pipeline"
+              "title": "19th Oct 2026"
             }
           }
         ],
@@ -203,6 +203,7 @@
   },
   "active": "6206fc4be257135e",
   "lastOpenFiles": [
+    "suraksha_ai_pipeline.md",
     "Untitled.md",
     "Untitled 1.md",
     "Universal Voice AI Pipeline.md",
@@ -211,7 +212,6 @@
     "OnPrimGPUSetup",
     "images/mermaid-sequence-2026-10-16T06-37-12.png",
     "research_notes/Self hosting LLM cost Pune/cloud_rental_prices.md",
-    "suraksha_ai_pipeline.md",
     "reports/Self hosting LLM cost Pune.md.tmp.23164.5ab9c105e4ae",
     "reports/Self hosting LLM cost Pune.md.tmp.23164.e54c97770c55",
     "reports/Self hosting LLM cost Pune.md.tmp.23164.402549774ca8",
