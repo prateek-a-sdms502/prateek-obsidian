@@ -1,12 +1,12 @@
 # DPDP Policy Compliance Checker: Implementation Plan
 
-| | |
-|---|---|
-| **Working name** | `dpdp-checker` (product line: Suraksha) |
-| **Document version** | 1.0, 19 October 2026 |
-| **Status** | Baseline for Phase 0. Changes to decisions in section 16 require a new ADR. |
-| **Audience** | Engineers joining the project, reviewers, AI coding agents used for implementation and change requests |
-| **Owner** | AI Engineering, Stark Digital |
+|                      |                                                                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Working name**     | `dpdp-checker` (product line: Suraksha)                                                                                                                                       |
+| **Document version** | 1.0, 19 October 2026                                                                                                                                                          |
+| **Status**           | Baseline for Phase 0. Changes to decisions in section 16 require a new ADR.                                                                                                   |
+| **Audience**         | Engineers joining the project, reviewers, AI coding agents used for implementation and change requests                                                                        |
+| **Owner**            | AI Engineering, Stark Digital                                                                                                                                                 |
 | **Statutory anchor** | Digital Personal Data Protection Act, 2023 and Digital Personal Data Protection Rules, 2025 (G.S.R. 846(E), 13 Nov 2025). Substantive obligations apply from **13 May 2027**. |
 
 ## How to use this document
